@@ -1,0 +1,687 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1, user-scalable=no">
+<title>Тренировки</title>
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<style>
+:root{
+  --bg:#07070C;
+  --txt:#F4F4F8; --txt-2:rgba(235,235,245,.60); --txt-3:rgba(235,235,245,.30);
+  --blue:#0A84FF; --cyan:#5AC8FA; --green:#32D74B; --amber:#FF9F0A; --violet:#BF5AF2;
+  --r:26px;
+  --spring:cubic-bezier(.34,1.56,.64,1);
+  --ease:cubic-bezier(.32,.72,0,1);
+  --safe-t:env(safe-area-inset-top,0px);
+  --safe-b:env(safe-area-inset-bottom,0px);
+  --serif:"New York","Iowan Old Style","Palatino Linotype",Palatino,Georgia,serif;
+}
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{height:100%}
+body{
+  background:var(--bg);color:var(--txt);
+  font-family:-apple-system,BlinkMacSystemFont,"SF Pro Display","SF Pro Text","Helvetica Neue",system-ui,sans-serif;
+  font-size:17px;line-height:1.35;letter-spacing:-.01em;
+  overflow-x:hidden;overscroll-behavior-y:none;
+}
+/* живой свет под стеклом */
+body::before{
+  content:"";position:fixed;inset:-25%;z-index:0;pointer-events:none;
+  background:
+    radial-gradient(30% 22% at 20% 10%,rgba(10,132,255,.55),transparent 68%),
+    radial-gradient(26% 20% at 84% 20%,rgba(191,90,242,.42),transparent 70%),
+    radial-gradient(30% 22% at 62% 62%,rgba(0,199,190,.26),transparent 72%),
+    radial-gradient(34% 26% at 34% 96%,rgba(255,159,10,.28),transparent 72%);
+}
+#app{position:relative;z-index:1;padding:calc(var(--safe-t) + 16px) 15px calc(var(--safe-b) + 112px)}
+.hide{display:none!important}
+
+/* ---------- жидкое стекло ---------- */
+.g{
+  position:relative;isolation:isolate;
+  background:linear-gradient(158deg,rgba(255,255,255,.13),rgba(255,255,255,.06) 44%,rgba(255,255,255,.035)),rgba(12,12,20,.5);
+  border-radius:var(--r);
+  box-shadow:0 18px 44px rgba(0,0,0,.55),0 2px 8px rgba(0,0,0,.3);
+}
+/* градиентная световая кромка — то самое «стекло» */
+.g::before{
+  content:"";position:absolute;inset:0;border-radius:inherit;padding:1px;pointer-events:none;z-index:2;
+  background:linear-gradient(150deg,rgba(255,255,255,.62),rgba(255,255,255,.10) 34%,rgba(255,255,255,.02) 62%,rgba(255,255,255,.22));
+  -webkit-mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);
+  -webkit-mask-composite:xor;mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);mask-composite:exclude;
+}
+/* верхний блик */
+.g::after{
+  content:"";position:absolute;inset:0;border-radius:inherit;pointer-events:none;z-index:1;
+  background:radial-gradient(120% 60% at 22% -14%,rgba(255,255,255,.16),transparent 62%);
+}
+.g>*{position:relative;z-index:3}
+
+@keyframes rise{from{opacity:0;transform:translateY(18px) scale(.965)}to{opacity:1;transform:none}}
+.anim{animation:rise .55s var(--spring) both}
+@keyframes jelly{
+  0%{transform:scale(1,1)} 20%{transform:scale(1.035,.955)} 42%{transform:scale(.982,1.026)}
+  64%{transform:scale(1.014,.992)} 82%{transform:scale(.996,1.005)} 100%{transform:scale(1,1)}
+}
+.jelly{animation:jelly .66s cubic-bezier(.3,1,.4,1)}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition-duration:.01ms!important}}
+
+.eyebrow{font-size:11.5px;font-weight:620;letter-spacing:.85px;text-transform:uppercase;color:var(--txt-3)}
+h1{font-size:31px;font-weight:700;letter-spacing:-.75px;line-height:1.08}
+h2{font-size:21px;font-weight:680;letter-spacing:-.4px}
+.sub{font-size:15px;color:var(--txt-2)}
+.tiny{font-size:12.5px;color:var(--txt-3)}
+.num{font-variant-numeric:tabular-nums;font-feature-settings:"tnum" 1}
+
+/* ---------- герой ---------- */
+.hero{
+  padding:24px 22px 22px;margin-bottom:11px;overflow:hidden;
+  -webkit-backdrop-filter:blur(26px) saturate(180%);backdrop-filter:blur(26px) saturate(180%);
+}
+.hero .sheen{
+  position:absolute;top:-70%;left:-45%;width:42%;height:240%;z-index:2;pointer-events:none;
+  background:linear-gradient(90deg,transparent,rgba(255,255,255,.09),transparent);
+  transform:rotate(19deg);animation:sheen 2.6s var(--ease) .25s 1 both;
+}
+@keyframes sheen{from{left:-45%}to{left:135%}}
+.hero h1{margin:7px 0 0}
+.hero .cap{font-size:14px;color:var(--txt-2);margin-top:7px;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.prb{
+  display:inline-grid;place-items:center;padding:3px 9px;border-radius:999px;
+  background:linear-gradient(160deg,rgba(50,215,75,.9),rgba(28,170,55,.85));color:#fff;
+  font-size:12px;font-weight:700;letter-spacing:-.1px;
+  box-shadow:0 4px 14px rgba(50,215,75,.34),inset 0 1px 0 rgba(255,255,255,.45);
+  animation:pop .5s var(--spring) both;
+}
+@keyframes pop{from{transform:scale(.4);opacity:0}to{transform:scale(1);opacity:1}}
+
+.segs{display:flex;gap:5px;margin-top:18px}
+.seg{
+  flex:1;height:10px;border-radius:6px;position:relative;overflow:hidden;
+  background:rgba(255,255,255,.09);box-shadow:inset 0 1px 0 rgba(255,255,255,.14);
+}
+.seg::after{
+  content:"";position:absolute;inset:0;border-radius:inherit;
+  background:linear-gradient(90deg,var(--blue),var(--cyan));
+  transform:scaleX(0);transform-origin:left;
+  transition:transform .6s var(--spring),background .3s;
+}
+.seg.on::after{transform:scaleX(1)}
+.seg.pr::after{background:linear-gradient(90deg,var(--green),#7BE495);box-shadow:0 0 12px rgba(50,215,75,.5)}
+
+.chips{display:flex;gap:6px;margin-top:16px;flex-wrap:wrap}
+.chip{
+  padding:7px 13px;border-radius:14px;font-size:13px;font-weight:580;
+  background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.13);color:var(--txt-2);
+  transition:transform .32s var(--spring),background .22s,color .22s,border-color .22s;
+}
+.chip.on{background:rgba(10,132,255,.3);border-color:rgba(10,132,255,.55);color:#fff}
+.chip.deload.on{background:rgba(255,159,10,.26);border-color:rgba(255,159,10,.5)}
+.chip:active{transform:scale(.87)}
+
+.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:9px;margin-bottom:11px}
+.stat{padding:15px 8px;text-align:center}
+.stat .v{font-size:26px;font-weight:720;letter-spacing:-1.1px;font-variant-numeric:tabular-nums;line-height:1.05}
+.stat .k{font-size:11px;color:var(--txt-2);margin-top:4px;font-weight:570}
+.stat.hl .v{background:linear-gradient(160deg,#fff,#9FC6FF);-webkit-background-clip:text;background-clip:text;color:transparent}
+
+.msg{padding:19px 22px 20px;margin-bottom:11px}
+.msg p{font-family:var(--serif);font-size:18px;line-height:1.46;letter-spacing:-.05px;margin-top:7px;color:#E9E9F0}
+
+/* ---------- упражнения ---------- */
+.card{padding:16px 17px;margin-bottom:10px;transition:transform .3s var(--spring)}
+.card .top{display:flex;gap:12px;align-items:flex-start}
+.idx{
+  flex:0 0 29px;height:29px;border-radius:11px;display:grid;place-items:center;
+  background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.14);
+  font-size:13px;font-weight:650;color:var(--txt-2);
+  transition:background .35s var(--spring),color .3s,transform .45s var(--spring),box-shadow .3s;
+}
+.idx.done{
+  background:linear-gradient(160deg,var(--green),#22B03C);border-color:transparent;color:#fff;
+  transform:rotate(-6deg) scale(1.06);box-shadow:0 5px 16px rgba(50,215,75,.4);
+}
+.nm{flex:1;font-size:16px;font-weight:590;letter-spacing:-.25px;line-height:1.28}
+.meta{display:flex;gap:7px;margin-top:8px;flex-wrap:wrap}
+.pill{
+  font-size:12.5px;font-weight:570;padding:4px 10px;border-radius:10px;
+  background:rgba(10,132,255,.2);color:#8CC6FF;border:1px solid rgba(10,132,255,.28)
+}
+.pill.tech{background:rgba(255,159,10,.16);color:#FFC66B;border-color:rgba(255,159,10,.26)}
+.note{font-size:13.5px;color:var(--txt-2);margin-top:9px;line-height:1.4}
+
+.inputs{display:flex;gap:9px;margin-top:13px}
+.field{
+  flex:1;display:flex;align-items:center;gap:6px;padding:11px 13px;border-radius:15px;
+  background:rgba(0,0,0,.28);border:1px solid rgba(255,255,255,.12);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.07);
+  transition:transform .38s var(--spring),border-color .22s,background .22s,box-shadow .22s;
+}
+.field:focus-within{
+  transform:scale(1.035);border-color:rgba(10,132,255,.7);background:rgba(10,132,255,.12);
+  box-shadow:0 0 0 4px rgba(10,132,255,.14),inset 0 1px 0 rgba(255,255,255,.1);
+}
+.field input{
+  width:100%;background:none;border:none;outline:none;color:var(--txt);
+  font-size:17px;font-weight:630;font-variant-numeric:tabular-nums;
+  font-family:inherit;letter-spacing:-.3px;min-width:0
+}
+.field input::placeholder{color:var(--txt-3);font-weight:500}
+.field .u{font-size:12.5px;color:var(--txt-3);font-weight:570;flex:0 0 auto}
+.last{margin-top:9px;font-size:12.5px;color:var(--txt-3);display:flex;gap:5px;align-items:center}
+.last b{color:#5BE07A;font-weight:650}
+.last.miss b{color:var(--txt-2)}
+
+.sec{margin:20px 4px 10px;display:flex;align-items:baseline;justify-content:space-between}
+.acc{padding:0;margin-bottom:9px;overflow:hidden;content-visibility:auto;contain-intrinsic-size:auto 62px}
+.acc>.hd{padding:15px 17px;display:flex;align-items:center;justify-content:space-between;gap:10px;cursor:pointer;
+  transition:transform .3s var(--spring)}
+.acc>.hd:active{transform:scale(.985)}
+.acc>.hd .t{font-size:15.5px;font-weight:600;letter-spacing:-.25px}
+.acc>.bd{display:none;padding:0 17px 15px}
+.acc.open>.bd{display:block;animation:rise .42s var(--ease) both}
+.arw{color:var(--txt-3);font-size:15px;transition:transform .4s var(--spring);flex:0 0 auto}
+.acc.open .arw{transform:rotate(90deg)}
+.line{display:flex;gap:10px;padding:10px 0;border-top:1px solid rgba(255,255,255,.08);font-size:14.5px}
+.line:first-child{border-top:none}
+.line .l{flex:1;line-height:1.35}
+.line .r{flex:0 0 auto;color:var(--txt-2);font-variant-numeric:tabular-nums;font-weight:590;text-align:right}
+
+.lg{padding:15px 17px;margin-bottom:10px}
+.lg .t{font-size:15.5px;font-weight:600;margin-bottom:12px;letter-spacing:-.25px}
+.wk{display:flex;gap:7px;overflow-x:auto;padding-bottom:3px;scrollbar-width:none}
+.wk::-webkit-scrollbar{display:none}
+.wcell{
+  flex:0 0 auto;min-width:74px;padding:10px 11px;border-radius:14px;text-align:center;
+  background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);
+  transition:transform .3s var(--spring)
+}
+.wcell .n{font-size:10.5px;color:var(--txt-3);font-weight:630;letter-spacing:.4px}
+.wcell .v{font-size:14px;font-weight:650;margin-top:3px;font-variant-numeric:tabular-nums;letter-spacing:-.35px}
+.wcell.empty .v{color:var(--txt-3);font-weight:500}
+.wcell.now{border-color:rgba(10,132,255,.5);background:rgba(10,132,255,.16)}
+.wcell.pr{border-color:rgba(50,215,75,.45);background:rgba(50,215,75,.15);box-shadow:0 4px 14px rgba(50,215,75,.16)}
+
+.btn{
+  width:100%;padding:15px;border-radius:18px;border:1px solid rgba(255,255,255,.14);
+  background:rgba(255,255,255,.08);color:var(--txt);font-family:inherit;font-size:16px;font-weight:610;
+  letter-spacing:-.25px;transition:transform .3s var(--spring);
+}
+.btn:active{transform:scale(.955)}
+.btn.blue{background:linear-gradient(165deg,#2E93FF,#0A6CDF);border-color:transparent;color:#fff;box-shadow:0 8px 22px rgba(10,132,255,.4)}
+.btn.warn{background:rgba(255,59,88,.16);border-color:rgba(255,59,88,.3);color:#FF7A93}
+
+nav{
+  position:fixed;left:14px;right:14px;bottom:calc(var(--safe-b) + 12px);z-index:20;
+  display:flex;padding:6px;gap:4px;border-radius:25px;isolation:isolate;
+  background:linear-gradient(158deg,rgba(255,255,255,.13),rgba(255,255,255,.05));
+  -webkit-backdrop-filter:blur(30px) saturate(180%);backdrop-filter:blur(30px) saturate(180%);
+  box-shadow:0 16px 44px rgba(0,0,0,.65),0 2px 8px rgba(0,0,0,.4);
+}
+nav::before{
+  content:"";position:absolute;inset:0;border-radius:inherit;padding:1px;pointer-events:none;z-index:2;
+  background:linear-gradient(150deg,rgba(255,255,255,.6),rgba(255,255,255,.08) 40%,rgba(255,255,255,.2));
+  -webkit-mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);
+  -webkit-mask-composite:xor;mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);mask-composite:exclude;
+}
+#pin{
+  position:absolute;top:6px;bottom:6px;border-radius:20px;z-index:1;
+  background:linear-gradient(165deg,rgba(255,255,255,.2),rgba(255,255,255,.09));
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.3);
+  transition:left .52s var(--spring),width .52s var(--spring);
+}
+nav button{
+  position:relative;z-index:3;
+  flex:1;padding:9px 4px 8px;border:none;background:none;color:var(--txt-3);
+  font-family:inherit;font-size:10.5px;font-weight:590;letter-spacing:-.1px;
+  border-radius:20px;transition:color .3s;display:grid;gap:3px;justify-items:center
+}
+nav button svg{width:22px;height:22px;stroke-width:1.95;transition:transform .45s var(--spring)}
+nav button.on{color:#fff}
+nav button.on svg{transform:scale(1.14) translateY(-1px)}
+nav button:active svg{transform:scale(.86)}
+.rest{padding:32px 22px;text-align:center}
+.rest .e{font-size:42px;margin-bottom:10px}
+.rest p{font-family:var(--serif);font-size:18px;line-height:1.46;color:#E9E9F0}
+
+.tmr{
+  position:fixed;left:50%;transform:translateX(-50%);bottom:calc(var(--safe-b) + 84px);z-index:19;
+  display:flex;align-items:center;gap:12px;padding:10px 12px 10px 18px;border-radius:22px;
+  -webkit-backdrop-filter:blur(26px) saturate(180%);backdrop-filter:blur(26px) saturate(180%);
+  animation:rise .45s var(--spring) both;
+}
+.tmr .tv{font-size:21px;font-weight:700;letter-spacing:-.6px;font-variant-numeric:tabular-nums}
+.tmr .tl{font-size:11px;color:var(--txt-3);font-weight:600;letter-spacing:.4px;text-transform:uppercase}
+.tmr .tx{
+  border:none;border-radius:15px;padding:9px 15px;font-family:inherit;font-size:14px;font-weight:620;
+  background:rgba(255,255,255,.12);color:var(--txt);transition:transform .3s var(--spring)
+}
+.tmr .tx:active{transform:scale(.9)}
+.tmr.ready .tv{color:#5BE07A}
+.restbtn{
+  margin-top:14px;width:100%;padding:12px;border-radius:16px;border:none;
+  background:rgba(255,255,255,.09);color:var(--txt-2);font-family:inherit;font-size:14px;font-weight:600;
+  transition:transform .3s var(--spring)
+}
+.restbtn:active{transform:scale(.96)}
+</style>
+</head>
+<body>
+<div id="app">
+  <section id="v-today"></section>
+  <section id="v-prog" class="hide"></section>
+  <section id="v-log" class="hide"></section>
+  <section id="v-set" class="hide"></section>
+</div>
+
+<div id="timer" class="g tmr hide">
+  <div><div class="tl">Отдых</div><div class="tv num" id="tv">0:00</div></div>
+  <button class="tx" id="tstop">Стоп</button>
+</div>
+
+<nav>
+  <span id="pin"></span>
+  <button data-v="today" class="on"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M6 3v4M18 3v4M3.5 9.5h17M5 5.5h14a2 2 0 0 1 2 2v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-11a2 2 0 0 1 2-2z" stroke-linecap="round"/></svg>Сегодня</button>
+  <button data-v="prog"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M4 5.5A2 2 0 0 1 6 3.5h11a2 2 0 0 1 2 2v15a2 2 0 0 0-2-2H6a2 2 0 0 1-2-2v-11zM19 18.5V3.5M8 8h7M8 12h7" stroke-linecap="round"/></svg>Программа</button>
+  <button data-v="log"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M4 19V9M9.3 19V5M14.7 19v-6M20 19v-9" stroke-linecap="round"/></svg>Логбук</button>
+  <button data-v="set"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="12" r="3.2"/><path d="M12 2.5v3M12 18.5v3M2.5 12h3M18.5 12h3M5.2 5.2l2.1 2.1M16.7 16.7l2.1 2.1M18.8 5.2l-2.1 2.1M7.3 16.7l-2.1 2.1" stroke-linecap="round"/></svg>Ещё</button>
+</nav>
+
+<script>
+"use strict";
+const tg = window.Telegram && window.Telegram.WebApp;
+if (tg) { tg.ready(); tg.expand(); try { tg.setHeaderColor("#07070C"); tg.setBackgroundColor("#07070C"); } catch(e){} try{ tg.disableVerticalSwipes(); }catch(e){} }
+const hap = t => { try { tg.HapticFeedback.impactOccurred(t||"light"); } catch(e){} };
+
+/* ============ ДАННЫЕ ПРОГРАММЫ ============ */
+const R = {
+  "4-6":["6","5–6","5","4–5","5"], "5-8":["7–8","6–7","6","5","6–7"],
+  "6-8":["8","7","6–7","6","7"], "6-10":["9–10","8","7","6","8"],
+  "8-10":["10","9","8–9","8","9"], "8-12":["11–12","10","9","8","10"],
+  "10-12":["12","11","10–11","10","11"], "10-15":["14–15","12–13","11–12","10","12"],
+  "12-15":["15","13–14","12–13","12","13"], "15-20":["18–20","16–17","15–16","15","17"]
+};
+const reps = (k,w) => w<=4 ? R[k][w-1] : w===5 ? R[k][3]+"+" : R[k][4]+" легко";
+const half = s => s==="3–4" ? "2" : String(Math.max(1, Math.floor(parseInt(s)/2) || 1));
+
+const DAYS = {
+  1:{t:"Верх, тяжёлый",s:"Грудь ×2 · спина ×2 · руки · дельта",e:[
+    {id:"a1",n:"Наклонный жим в Смите",k:"tb",top:"4-6",back:"8-10",note:"Топ-сет + бэк-офф. Чередование с №2",log:1},
+    {id:"a2",n:"Подтягивания с весом / тяга блока широким хватом",k:"tb",top:"5-8",back:"8-10",note:"Топ-сет + бэк-офф",log:1},
+    {id:"a3",n:"Жим в хаммере на грудь",k:"st",sets:"2",r:"8-12",note:"Второй грудной слот",log:1},
+    {id:"a4",n:"Тяга Т-грифа",k:"st",sets:"2",r:"6-10",log:1},
+    {id:"a5",n:"Французский жим лёжа (EZ)",k:"st",sets:"2",r:"8-10",drop:1,note:"Ноют локти — жим узким в Смите",log:1},
+    {id:"a6",n:"Подъём гантелей на бицепс",k:"st",sets:"2",r:"8-10",log:1},
+    {id:"a7",n:"Махи гантелями стоя",k:"myo",note:"Средняя дельта"},
+    {id:"a8",n:"Вис на турнике",k:"fin",r:"45–60 сек",note:"Растяжка широчайших"}
+  ]},
+  2:{t:"Ноги",s:"Только тренажёры",e:[
+    {id:"b1",n:"Сгибания ног сидя",k:"st",sets:"3",r:"8-12",part:1,note:"Первым: сидя растит бицепс бедра заметно лучше, чем лёжа",log:1},
+    {id:"b2",n:"Жим ногами",k:"st",sets:"3",r:"8-12",note:"Стопы ниже и уже — больше квадрицепс",log:1},
+    {id:"b3",n:"Разгибания ног сидя",k:"st",sets:"2",r:"10-15",drop:1,note:"Прямая мышца бедра",log:1},
+    {id:"b4",n:"Сгибания ног лёжа",k:"st",sets:"2",r:"10-12"},
+    {id:"b5",n:"Икры стоя",k:"st",sets:"3–4",r:"10-15",note:"Пауза 1–2 сек в растяжении внизу"}
+  ]},
+  3:{t:"Лёгкий день",s:"Пресс · шея · добор · кардио",e:[
+    {id:"c1",n:"Кабельный кранч",k:"st",sets:"3",r:"10-15",note:"Пресс с прогрессией веса. Можно близко к отказу",log:1},
+    {id:"c2",n:"Подъём ног в висе / обратный кранч",k:"st",sets:"2",r:"12-15",note:"Эксцентрик 2–3 сек, без рывков"},
+    {id:"c3",n:"Махи в кроссовере одной рукой",k:"st",sets:"3",r:"12-15",note:"Добор средней дельты. RIR 2–3, без техник"},
+    {id:"c4",n:"Обратная бабочка",k:"st",sets:"2",r:"15-20",note:"Задняя дельта. RIR 2–3",w3:1},
+    {id:"c5",n:"Икры стоя — акцент на растяжку",k:"st",sets:"2",r:"12-15",note:"Пауза внизу + лёгкие частичные",w3:1},
+    {id:"c6",n:"Pallof press / боковая планка",k:"st",sets:"2",r:"12-15",note:"Косые только легко. Тяжёлые наклоны не делаем — бережём талию",w3:1},
+    {id:"c7",n:"Сгибания шеи лёжа (блин на лбу)",k:"st",sets:"2",r:"15-20",note:"Старт 2,5–5 кг. Медленно, без рывков",log:1},
+    {id:"c8",n:"Разгибания шеи лёжа на животе",k:"st",sets:"2",r:"15-20",note:"Полная амплитуда, плавно"},
+    {id:"c9",n:"Кардио LISS",k:"fin",r:"20–35 мин",note:"Вело / эллипс / ходьба в горку. Не бег"}
+  ]},
+  4:{t:"Грудь · средняя дельта · бицепс",s:"",e:[
+    {id:"d1",n:"Бабочка",k:"st",sets:"2",r:"12-15",part:1,note:"Праймер"},
+    {id:"d2",n:"Жим в Смите",k:"st",sets:"2",r:"6-10",log:1},
+    {id:"d3",n:"Жим в наклонном хаммере",k:"rp",log:1},
+    {id:"d4",n:"Махи в кроссовере (трос за корпусом)",k:"st",sets:"2",r:"12-15",part:1},
+    {id:"d5",n:"Махи гантелями стоя",k:"myo"},
+    {id:"d6",n:"Сгибания на скамье Скотта",k:"st",sets:"2",r:"8-12",part:1,note:"Свежий бицепс — вес выше",log:1},
+    {id:"d7",n:"Сгибания на наклонной / молотки",k:"st",sets:"2",r:"10-15"},
+    {id:"d8",n:"Удержание нижней точки разводки",k:"fin",r:"45 сек",note:"Растяжка груди"}
+  ]},
+  5:{t:"Спина · задняя дельта · трицепс",s:"",e:[
+    {id:"e1",n:"Тяга блока узким нейтральным хватом",k:"tb",top:"6-8",back:"10-12",note:"Топ-сет + бэк-офф",log:1},
+    {id:"e2",n:"Тяга в хаммере",k:"rp",log:1},
+    {id:"e3",n:"Пуловер прямыми руками",k:"st",sets:"2",r:"12-15",part:1},
+    {id:"e4",n:"Тяга с упором грудью в тренажёре",k:"st",sets:"2",r:"10-15",note:"Фокус на трапецию и середину спины",log:1},
+        {id:"e6",n:"Задняя дельта в пек-деке",k:"myo"},
+    {id:"e7",n:"Жим узким хватом в Смите",k:"st",sets:"2",r:"6-10",note:"Тяжёлая база трицепса",log:1},
+    {id:"e8",n:"Трицепс из-за головы в кроссовере",k:"st",sets:"2",r:"10-15",part:1},
+    {id:"e9",n:"Гантель за головой + вис",k:"fin",r:"по 45 сек",note:"Растяжка трицепса и широчайших"}
+  ]}
+};
+const WEEKS = {
+  1:{n:"Разгон",d:"Вес стартовый. Повторы идут с запасом 2 (RIR 2). Техники выключены — только чистые подходы"},
+  2:{n:"Наращивание",d:"+2–3% к неделе 1, если идёт. RIR 1–2. Включаются частичные в растяжении"},
+  3:{n:"Тяжёлая",d:"+2–3% к неделе 2, если идёт. RIR 1. Добавляются дроп-сеты"},
+  4:{n:"Очень тяжёлая",d:"+2–3% к неделе 3, если идёт. База 0–1 RIR, изоляция — до отказа. Включаются rest-pause и мио-повторы"},
+  5:{n:"Рекордная",d:"Вес тот же, что в неделе 4. Задача — побить повторы в каждой клетке. Всё включено"},
+  6:{n:"Разгрузка",d:"По состоянию: устал — вес −15%, половина подходов, RIR 3–4. Свежий — 2–3 лёгких дня и раньше начинай новый блок"}
+};
+const DOW = {1:1,2:2,3:3,4:4,5:5,0:null,6:null};
+const DNAME = ["Воскресенье","Понедельник","Вторник","Среда","Четверг","Пятница","Суббота"];
+
+/* какие подходы/повторы показать для упражнения в неделе w */
+function plan(e,w){
+  if(e.k==="fin") return {sets:"1",rep:e.r,tech:[]};
+  if(e.k==="tb"){
+    if(w===6) return {sets:"1",rep:reps(e.back,6),tech:["Без топ-сета"]};
+    return {sets:"1+1",rep:reps(e.top,w)+" / "+reps(e.back,w),tech:w===5?["Бей неделю 4"]:[]};
+  }
+  if(e.k==="rp"){
+    if(w<=3) return {sets:"2",rep:reps("8-12",w),tech:["Rest-pause с недели 4"]};
+    if(w<=5) return {sets:"1 RP",rep:"8–10 → 4–6 → 2–4",tech:["Rest-pause"].concat(w===5?["Бей неделю 4"]:[])};
+    return {sets:"1",rep:"10–12 легко",tech:[]};
+  }
+  if(e.k==="myo"){
+    if(w<=3) return {sets:"2",rep:reps("12-15",w),tech:["Мио-повторы с недели 4"]};
+    if(w<=5) return {sets:"1",rep:"12–15 + мини-сеты",tech:["Мио-повторы"]};
+    return {sets:"1",rep:"12–15 легко",tech:[]};
+  }
+  const t=[];
+  if(w!==6){ if(e.part&&w>=2) t.push("Частичные в растяжении"); if(e.drop&&w>=3) t.push("Дроп-сет в последнем"); }
+  return {sets: w===6?half(e.sets):e.sets, rep:reps(e.r,w), tech:t};
+}
+const exOf = (d,w) => DAYS[d].e.filter(e => !(e.w3 && w<3) && !(w===6 && e.k!=="st" && e.k!=="fin" && d===3));
+
+/* ============ ХРАНИЛИЩЕ ============ */
+const mem = {};
+const CS = tg && tg.CloudStorage && tg.CloudStorage.getItem ? tg.CloudStorage : null;
+const get = k => new Promise(res => CS ? CS.getItem(k,(e,v)=>res(e?null:v)) : res(mem[k]||null));
+const set = (k,v) => new Promise(res => { mem[k]=v; CS ? CS.setItem(k,v,()=>res()) : res(); });
+
+let CFG = {start:null, week:null};
+let LOG = {};                       // {"w1":{"a1":"60x8", ...}, ...}
+const lkey = w => "log_w"+w;
+
+async function load(){
+  const c = await get("cfg");
+  if(c){ try{ CFG = Object.assign(CFG, JSON.parse(c)); }catch(e){} }
+  if(!CFG.start){ CFG.start = mondayOf(new Date()).toISOString().slice(0,10); await set("cfg",JSON.stringify(CFG)); }
+  for(let w=1;w<=6;w++){
+    const v = await get(lkey(w));
+    LOG[w] = v ? (()=>{try{return JSON.parse(v)}catch(e){return {}}})() : {};
+  }
+}
+function mondayOf(d){ const x=new Date(d); const g=(x.getDay()+6)%7; x.setDate(x.getDate()-g); x.setHours(0,0,0,0); return x; }
+function autoWeek(){
+  const s = mondayOf(new Date(CFG.start+"T00:00:00"));
+  const diff = Math.floor((mondayOf(new Date()) - s)/(7*864e5));
+  return Math.min(6, Math.max(1, diff+1));
+}
+const curWeek = () => CFG.week || autoWeek();
+async function saveEntry(w,id,val){
+  LOG[w] = LOG[w]||{};
+  if(val) LOG[w][id]=val; else delete LOG[w][id];
+  await set(lkey(w), JSON.stringify(LOG[w]));
+}
+
+/* ============ РЕНДЕР ============ */
+const $ = s => document.querySelector(s);
+const esc = s => String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;"}[c]));
+
+const logList = (d,w) => exOf(d,w).filter(e=>e.k!=="fin");
+function dayStats(d,w){
+  const logg = logList(d,w);
+  const done = logg.filter(e=>LOG[w]&&LOG[w][e.id]).length;
+  let pr = 0;
+  if(w>1) for(const e of logg){
+    const v=LOG[w]&&LOG[w][e.id], pv=LOG[w-1]&&LOG[w-1][e.id];
+    if(v&&pv&&cmp(v,pv)>0) pr++;
+  }
+  return {total:logg.length, done, pr, pct: logg.length?Math.round(done/logg.length*100):0};
+}
+function blockPR(w){
+  let n=0;
+  for(let i=2;i<=w;i++) for(const id of Object.keys(LOG[i]||{})){
+    const pv=LOG[i-1]&&LOG[i-1][id];
+    if(pv&&cmp(LOG[i][id],pv)>0) n++;
+  }
+  return n;
+}
+
+function exCard(e,w,d,i){
+  const p = plan(e,w), val = (LOG[w]&&LOG[w][e.id])||"";
+  const prev = w>1 ? (LOG[w-1]&&LOG[w-1][e.id]) : null;
+  let m = val.match(/^([\d.,]+)x(\d+)$/i);
+  const kg = m?m[1]:"", rp = m?m[2]:"";
+  const canLog = e.k!=="fin";
+  return `<div class="g card anim" data-ex="${e.id}" style="animation-delay:${.2+i*.045}s">
+    <div class="top">
+      <div class="idx ${val?'done':''}">${e.k==="fin"?"✓":i}</div>
+      <div style="flex:1;min-width:0">
+        <div class="nm">${esc(e.n)}</div>
+        <div class="meta">
+          <span class="pill num">${p.sets} × ${p.rep}</span>
+          ${p.tech.map(t=>`<span class="pill tech">${esc(t)}</span>`).join("")}
+        </div>
+        ${e.note?`<div class="note">${esc(e.note)}</div>`:""}
+      </div>
+    </div>
+    ${canLog?`<div class="inputs">
+      <label class="field"><input type="text" inputmode="decimal" placeholder="Вес" value="${kg}" data-f="kg"><span class="u">кг</span></label>
+      <label class="field"><input type="text" inputmode="numeric" placeholder="Повторы" value="${rp}" data-f="rp"><span class="u">повт.</span></label>
+    </div>
+    ${prev?`<div class="last ${(m&&cmp(val,prev)>=0)?'':'miss'}">Неделя ${w-1}: <b class="num">${esc(prev.replace('x','×'))}</b> — надо побить</div>`:""}`:""}
+  </div>`;
+}
+function cmp(a,b){
+  const pa=a.match(/^([\d.,]+)x(\d+)$/i), pb=b.match(/^([\d.,]+)x(\d+)$/i);
+  if(!pa||!pb) return 0;
+  const wa=parseFloat(pa[1].replace(",",".")), wb=parseFloat(pb[1].replace(",","."));
+  if(wa!==wb) return wa>wb?1:-1;
+  return parseInt(pa[2])-parseInt(pb[2]);
+}
+
+function viewToday(){
+  const now = new Date(), d = DOW[now.getDay()], w = curWeek();
+  const wk = WEEKS[w];
+  let html = "";
+  if(!d){
+    html = `<div class="g hero">
+      <div class="greet">Сегодня ${esc(DNAME[now.getDay()].toLowerCase())},<b>день отдыха</b></div>
+      <div class="cap" style="margin-top:10px">Неделя ${w} из 6 — ${esc(wk.n)}. Следующая тренировка в понедельник.</div></div>
+      <div class="g rest"><div class="e">🌙</div><p>Мышцы растут не в зале, а сейчас.<br>Сон 7–9 часов и 8–10 тысяч шагов.</p></div>`;
+    $("#v-today").innerHTML = html; return;
+  }
+  const list = exOf(d,w), logg = list.filter(e=>e.k!=="fin");
+  const done = logg.filter(e=>LOG[w]&&LOG[w][e.id]).length;
+  const st = dayStats(d,w);
+  const segs = logList(d,w).map((e,i)=>{
+    const v=LOG[w]&&LOG[w][e.id], pv=w>1?(LOG[w-1]&&LOG[w-1][e.id]):null;
+    const pr=v&&pv&&cmp(v,pv)>0;
+    return `<i class="seg ${v?'on':''} ${pr?'pr':''}" data-s="${e.id}" style="transition-delay:${i*45}ms"></i>`;
+  }).join("");
+  html = `<div class="g hero anim"><i class="sheen"></i>
+    <div class="eyebrow">${esc(DNAME[now.getDay()])} · неделя ${w} из 6</div>
+    <h1>${esc(DAYS[d].t)}</h1>
+    <div class="cap" id="cap"><span>${st.done} из ${st.total} записано</span>${st.pr?`<span class="prb" id="prbadge">${st.pr} рекорд${st.pr>4?'ов':st.pr>1?'а':''}</span>`:""}</div>
+    <div class="segs" id="segs">${segs}</div>
+    <div class="chips" id="wkchips">
+      ${[1,2,3,4,5,6].map(i=>`<button class="chip ${i===w?'on':''} ${i===6?'deload':''}" data-w="${i}">Нед. ${i}</button>`).join("")}
+    </div>
+    <button class="restbtn" id="tstart">Засечь отдых</button>
+  </div>
+  <div class="stats">
+    <div class="g stat anim" style="animation-delay:.06s"><div class="v num">${w}<span style="font-size:15px;color:var(--txt-3);font-weight:600">/6</span></div><div class="k">неделя блока</div></div>
+    <div class="g stat anim" style="animation-delay:.1s"><div class="v num">${st.total}</div><div class="k">упражнений</div></div>
+    <div class="g stat hl anim" style="animation-delay:.14s"><div class="v num">${blockPR(w)}</div><div class="k">рекордов</div></div>
+  </div>
+  <div class="g msg anim" style="animation-delay:.18s"><div class="eyebrow">${esc(WEEKS[w].n)}</div><p>${esc(WEEKS[w].d)}</p></div>`;
+  let i=0;
+  html += list.map(e => exCard(e,w,d, e.k==="fin"?0:++i)).join("");
+  $("#v-today").innerHTML = html;
+}
+
+function viewProg(){
+  let h = `<div class="g hero"><div class="eyebrow">Блок 6 недель</div><h1>Программа</h1>
+    <div class="sub" style="margin-top:6px">План по весу — потолок, а не долг. Вес не идёт — оставайся на прежнем и бей повторы.</div></div>`;
+  for(let w=1;w<=6;w++){
+    h += `<div class="sec"><h2>Неделя ${w}</h2><span class="tiny">${esc(WEEKS[w].n)}</span></div>`;
+    h += `<div class="g card" style="padding:14px 16px"><div class="note" style="margin:0">${esc(WEEKS[w].d)}</div></div>`;
+    for(const d of [1,2,3,4,5]){
+      const list = exOf(d,w);
+      h += `<div class="g acc"><div class="hd"><div class="t">${["","Пн","Вт","Ср","Чт","Пт"][d]} · ${esc(DAYS[d].t)}</div><span class="arw">›</span></div><div class="bd">
+        ${list.map(e=>{const p=plan(e,w);return `<div class="line"><div class="l">${esc(e.n)}${p.tech.length?`<div class="tiny" style="margin-top:3px">${esc(p.tech.join(" · "))}</div>`:""}</div><div class="r num">${p.sets}×${p.rep}</div></div>`}).join("")}
+      </div></div>`;
+    }
+  }
+  $("#v-prog").innerHTML = h;
+}
+
+function viewLog(){
+  const cw = curWeek();
+  let h = `<div class="g hero"><div class="eyebrow">Блок · недели 1–6</div><h1>Логбук</h1>
+    <div class="sub" style="margin-top:6px">Зелёным — недели, где ты побил предыдущую. Это единственный настоящий индикатор роста.</div></div>`;
+  for(const d of [1,2,3,4,5]){
+    const list = DAYS[d].e.filter(e=>e.log);
+    if(!list.length) continue;
+    h += `<div class="sec"><h2>${["","Понедельник","Вторник","Среда","Четверг","Пятница"][d]}</h2><span class="tiny">${esc(DAYS[d].t)}</span></div>`;
+    for(const e of list){
+      h += `<div class="g lg"><div class="t">${esc(e.n)}</div><div class="wk">`;
+      for(let w=1;w<=6;w++){
+        const v = LOG[w]&&LOG[w][e.id], pv = w>1?(LOG[w-1]&&LOG[w-1][e.id]):null;
+        const pr = v&&pv&&cmp(v,pv)>0;
+        h += `<div class="wcell ${v?'':'empty'} ${w===cw?'now':''} ${pr?'pr':''}">
+          <div class="n">НЕД. ${w}</div><div class="v num">${v?esc(v.replace('x','×')):"—"}</div></div>`;
+      }
+      h += `</div></div>`;
+    }
+  }
+  $("#v-log").innerHTML = h;
+}
+
+function viewSet(){
+  const w = curWeek(), a = autoWeek();
+  $("#v-set").innerHTML = `<div class="g hero"><div class="eyebrow">Настройки</div><h1>Ещё</h1></div>
+  <div class="g card">
+    <div class="nm">Текущая неделя блока</div>
+    <div class="note">Считается автоматически от старта блока (${esc(CFG.start)}) — сейчас неделя ${a}.${CFG.week?` Стоит ручная: ${CFG.week}.`:""}</div>
+    <div class="chips" id="setchips">
+      <button class="chip ${!CFG.week?'on':''}" data-w="0">Авто</button>
+      ${[1,2,3,4,5,6].map(i=>`<button class="chip ${CFG.week===i?'on':''}" data-w="${i}">${i}</button>`).join("")}
+    </div>
+  </div>
+  <div class="g card">
+    <div class="nm">Новый блок</div>
+    <div class="note">Обнуляет счёт недель на сегодня. Записи прошлого блока останутся — перед стартом перепиши итоги недели 5, чтобы знать, где прибавлять вес.</div>
+    <button class="btn blue" id="newblock" style="margin-top:14px">Начать новый блок с сегодня</button>
+  </div>
+  <div class="g card">
+    <div class="nm">Очистить логбук</div>
+    <div class="note">Стирает все записи всех шести недель. Отменить нельзя.</div>
+    <button class="btn warn" id="wipe" style="margin-top:14px">Очистить записи</button>
+  </div>
+  <div class="g card"><div class="nm">Как это работает</div>
+    <div class="note">Приложение само определяет день недели и показывает нужную тренировку: пн — верх, вт — ноги, ср — лёгкий день, чт и пт — грудь и спина, выходные — отдых.
+    Вес и повторы сохраняются в облаке Telegram и синхронизируются между твоими устройствами.</div></div>`;
+}
+
+/* ============ СОБЫТИЯ ============ */
+function movePin(b){
+  const pin=document.getElementById("pin"), nv=b.parentElement;
+  pin.style.left=(b.offsetLeft)+"px"; pin.style.width=b.offsetWidth+"px";
+}
+document.querySelectorAll("nav button").forEach(b=>b.onclick=()=>{
+  hap("light"); movePin(b);
+  document.querySelectorAll("nav button").forEach(x=>x.classList.toggle("on",x===b));
+  ["today","prog","log","set"].forEach(v=>$("#v-"+v).classList.toggle("hide", v!==b.dataset.v));
+  if(b.dataset.v==="prog") viewProg();
+  if(b.dataset.v==="log") viewLog();
+  if(b.dataset.v==="set") viewSet();
+  window.scrollTo(0,0);
+});
+
+document.addEventListener("click", e=>{
+  const hd = e.target.closest(".acc>.hd");
+  if(hd){ hap("light"); hd.parentElement.classList.toggle("open"); return; }
+  const chip = e.target.closest("#wkchips .chip");
+  if(chip){ hap("medium"); CFG.week = +chip.dataset.w; set("cfg",JSON.stringify(CFG)); viewToday(); return; }
+  const sc = e.target.closest("#setchips .chip");
+  if(sc){ hap("medium"); const v=+sc.dataset.w; CFG.week = v||null; set("cfg",JSON.stringify(CFG)); viewSet(); viewToday(); return; }
+  if(e.target.id==="newblock"){
+    hap("heavy");
+    CFG.start = mondayOf(new Date()).toISOString().slice(0,10); CFG.week=null;
+    set("cfg",JSON.stringify(CFG)); viewSet(); viewToday();
+    try{ tg.showAlert("Новый блок начат. Сейчас неделя 1."); }catch(err){}
+    return;
+  }
+  if(e.target.id==="wipe"){
+    hap("heavy");
+    const go = async () => { for(let w=1;w<=6;w++){ LOG[w]={}; await set(lkey(w),"{}"); } viewToday(); viewSet(); };
+    try{ tg.showConfirm("Стереть все записи логбука?", ok=>{ if(ok) go(); }); }
+    catch(err){ go(); }
+  }
+});
+
+document.addEventListener("input", e=>{
+  const f = e.target.dataset && e.target.dataset.f;
+  if(!f) return;
+  const card = e.target.closest("[data-ex]"); if(!card) return;
+  const id = card.dataset.ex, w = curWeek();
+  const kg = (card.querySelector('[data-f="kg"]').value||"").trim().replace(",", ".");
+  const rp = (card.querySelector('[data-f="rp"]').value||"").trim();
+  const val = (kg && rp) ? kg+"x"+rp : "";
+  saveEntry(w,id,val);
+  const idx = card.querySelector(".idx");
+  if(idx && !idx.textContent.includes("✓")) idx.classList.toggle("done", !!val);
+  const d = DOW[new Date().getDay()];
+  if(d){
+    const st = dayStats(d,w);
+    const cp = document.getElementById("cap");
+    if(cp){
+      const pl = st.pr>4?"ов":st.pr>1?"а":"";
+      cp.innerHTML = "<span>"+st.done+" из "+st.total+" записано</span>"+
+        (st.pr?'<span class="prb">'+st.pr+" рекорд"+pl+"</span>":"");
+    }
+    const seg = document.querySelector('.seg[data-s="'+id+'"]');
+    if(seg){
+      const pv = w>1?(LOG[w-1]&&LOG[w-1][id]):null;
+      seg.classList.toggle("on", !!val);
+      seg.classList.toggle("pr", !!(val&&pv&&cmp(val,pv)>0));
+    }
+    if(val && !card.classList.contains("jelly")){
+      card.classList.add("jelly");
+      hap("medium");
+      setTimeout(()=>card.classList.remove("jelly"),700);
+    }
+  }
+});
+document.addEventListener("change", e=>{ if(e.target.dataset && e.target.dataset.f) hap("light"); });
+
+/* ---- таймер отдыха: считает вверх по метке времени ---- */
+let tFrom=0, tInt=null, tPing=0;
+const tFmt = x => Math.floor(x/60)+":"+String(x%60).padStart(2,"0");
+function tTick(){
+  const box=document.getElementById("timer"), e=document.getElementById("tv");
+  if(!box||!e) return;
+  const sec=Math.floor((Date.now()-tFrom)/1000);
+  e.textContent=tFmt(sec);
+  if(sec>=300) box.classList.add("ready");
+  const m=Math.floor(sec/60);
+  if(m>tPing){ tPing=m; if(!document.hidden) hap("light"); }
+  if(sec>=3600) tStop();
+}
+function tStart(){
+  tFrom=Date.now(); tPing=0; clearInterval(tInt);
+  const box=document.getElementById("timer");
+  box.classList.remove("hide","ready");
+  tTick(); tInt=setInterval(tTick,1000); hap("medium");
+}
+function tStop(){ clearInterval(tInt); tInt=null; document.getElementById("timer").classList.add("hide"); hap("light"); }
+document.addEventListener("click", e=>{
+  if(e.target.id==="tstart") tStart();
+  if(e.target.id==="tstop") tStop();
+});
+document.addEventListener("visibilitychange",()=>{ if(!document.hidden && tInt) tTick(); });
+
+load().then(()=>{ viewToday(); const a=document.querySelector("nav button.on"); if(a) movePin(a); });
+window.addEventListener("resize",()=>{const a=document.querySelector("nav button.on"); if(a) movePin(a);});
+</script>
+</body>
+</html>
