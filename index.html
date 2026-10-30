@@ -1,0 +1,1074 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+
+<title>Питание</title>
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Golos+Text:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&family=Unbounded:wght@500;700&display=swap">
+<style>
+/* Layout: phone-first single column; on desktop meal slots on the left, sticky day summary on the right.
+   Per-dish macros are set like the Argentine "Información nutricional" label on a supermarket pack. */
+:root {
+  --bg: #F1F4F6;
+  --surface: #FFFFFF;
+  --surface-2: #E6ECF0;
+  --ink: #13212B;
+  --muted: #586976;
+  --line: #D2DBE2;
+  --accent: #1C5E9E;
+  --accent-ink: #FFFFFF;
+  --accent-soft: #DBE8F5;
+  --sun: #9A6400;
+  --sun-soft: #FAEED0;
+  --p: #B4432F;
+  --f: #A87700;
+  --c: #377F48;
+  --warn: #9C421C;
+  --warn-soft: #FBE7DD;
+  --font-display: "Unbounded", "Golos Text", system-ui, sans-serif;
+  --font-body: "Golos Text", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  --radius: 10px;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0D151B; --surface: #142029; --surface-2: #1B2A35; --ink: #E4ECF1; --muted: #94A4B0; --line: #283845;
+    --accent: #7AB5EC; --accent-ink: #0D151B; --accent-soft: #19334C; --sun: #F0BE4C; --sun-soft: #382C10;
+    --p: #EC8C75; --f: #E8BC55; --c: #7FC68D; --warn: #F2A482; --warn-soft: #3A2219;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0D151B; --surface: #142029; --surface-2: #1B2A35; --ink: #E4ECF1; --muted: #94A4B0; --line: #283845;
+  --accent: #7AB5EC; --accent-ink: #0D151B; --accent-soft: #19334C; --sun: #F0BE4C; --sun-soft: #382C10;
+  --p: #EC8C75; --f: #E8BC55; --c: #7FC68D; --warn: #F2A482; --warn-soft: #3A2219;
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+body {
+  margin: 0; background: var(--bg); color: var(--ink);
+  font-family: var(--font-body); font-size: 16px; line-height: 1.55;
+  -webkit-font-smoothing: antialiased;
+}
+body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-area-inset-top, 0px); z-index: 10; background: var(--bg); }
+.wrap {
+  max-width: 1180px; margin: 0 auto;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+}
+h1, h2, h3 { text-wrap: balance; margin: 0; }
+p { margin: 0; }
+a { color: var(--accent); }
+button { font: inherit; color: inherit; }
+.hide, [hidden] { display: none !important; }
+.mono { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+.eyebrow { font-family: var(--font-mono); font-size: 0.75rem; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); }
+
+/* header */
+.top { padding-block: 24px 16px; display: grid; gap: 10px; }
+.top h1 { font-family: var(--font-display); font-weight: 700; font-size: clamp(1.55rem, 4.2vw, 2.5rem); line-height: 1.1; letter-spacing: -0.01em; }
+.top .lede { color: var(--muted); max-width: 62ch; }
+
+/* tabs */
+.tabs { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 9; background: var(--bg); border-bottom: 1px solid var(--line); }
+.tabs .wrap { display: flex; gap: 4px; overflow-x: auto; scrollbar-width: none; }
+.tabs .wrap::-webkit-scrollbar { display: none; }
+.tabs a { flex: 0 0 auto; padding: 12px 12px 10px; text-decoration: none; color: var(--muted); font-weight: 600; font-size: 0.95rem; border-bottom: 3px solid transparent; white-space: nowrap; }
+.tabs a[aria-current="page"] { color: var(--ink); border-bottom-color: var(--accent); }
+.tabs a:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+
+main { padding-block: 20px 48px; }
+.view { display: grid; gap: 20px; }
+
+/* day picker */
+.daybar { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 14px; display: grid; gap: 12px; }
+.days { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 6px; }
+.day { display: grid; justify-items: center; padding: 7px 0 6px; border-radius: 10px; border: 1px solid var(--line); background: var(--bg); cursor: pointer; }
+.day .a { font-family: var(--font-mono); font-size: 0.68rem; letter-spacing: 0.04em; text-transform: uppercase; color: var(--muted); }
+.day .b { font-family: var(--font-display); font-weight: 500; font-size: 1.05rem; line-height: 1.35; }
+.day .c { font-size: 0.68rem; color: var(--muted); }
+.day.tr .c { color: var(--sun); font-weight: 600; }
+.day.today { border-color: var(--muted); }
+.day[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+.day[aria-pressed="true"] .a, .day[aria-pressed="true"] .c { color: var(--accent-ink); }
+.day:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.dayinfo { font-size: 0.95rem; color: var(--muted); }
+.dayinfo b { color: var(--ink); font-weight: 600; }
+
+/* controls */
+.controls { display: flex; flex-wrap: wrap; gap: 10px 14px; align-items: center; }
+.chip input, .check input { position: absolute; opacity: 0; width: 1px; height: 1px; pointer-events: none; }
+.chip input:focus-visible + label, .check input:focus-visible + label { outline: 2px solid var(--accent); outline-offset: 2px; }
+.check label { display: inline-flex; align-items: center; gap: 8px; cursor: pointer; font-size: 0.93rem; }
+.check .box { width: 20px; height: 20px; border: 2px solid var(--muted); border-radius: 5px; display: grid; place-items: center; }
+.check input:checked + label .box { background: var(--accent); border-color: var(--accent); }
+.check input:checked + label .box::after { content: ""; width: 9px; height: 5px; border-left: 2px solid var(--accent-ink); border-bottom: 2px solid var(--accent-ink); transform: translateY(-1px) rotate(-45deg); }
+.btn { font-weight: 600; font-size: 0.93rem; cursor: pointer; background: var(--accent); color: var(--accent-ink); border: 0; border-radius: 999px; padding: 10px 18px; text-decoration: none; display: inline-block; }
+.btn.wide { display: block; width: 100%; padding: 13px 18px; font-size: 1rem; text-align: center; }
+.btn.ghost { background: transparent; color: var(--accent); border: 1.5px solid var(--accent); }
+.btn:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
+.hint { color: var(--muted); font-size: 0.93rem; max-width: 70ch; }
+
+/* menu layout */
+.menu-grid { display: grid; gap: 20px; }
+@media (min-width: 960px) {
+  .menu-grid { grid-template-columns: minmax(0, 1fr) 330px; align-items: start; }
+  .summary { position: sticky; top: calc(env(safe-area-inset-top, 0px) + 64px); }
+}
+.slots { display: grid; gap: 18px; min-width: 0; }
+.slot { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 16px; display: grid; gap: 14px; min-width: 0; }
+.slot-head { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 4px 12px; }
+.slot-head h2 { font-family: var(--font-display); font-weight: 500; font-size: 1.15rem; }
+.slot-target { font-size: 0.78rem; color: var(--muted); }
+.chips { display: flex; flex-wrap: wrap; gap: 8px; border: 0; padding: 0; margin: 0; min-width: 0; }
+.chips legend { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+.chip { position: relative; }
+.chip label, .tday { display: inline-flex; align-items: center; gap: 6px; cursor: pointer; padding: 7px 12px; border: 1px solid var(--line); border-radius: 999px; font-size: 0.9rem; background: var(--bg); }
+.chip label:hover, .tday:hover { border-color: var(--muted); }
+.chip input:checked + label, .tday[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+.chip .mark { font-family: var(--font-mono); font-size: 0.68rem; padding: 1px 6px; border-radius: 999px; background: var(--warn-soft); color: var(--warn); }
+.chip input:checked + label .mark { background: rgb(255 255 255 / 0.22); color: inherit; }
+
+/* dish */
+.dish { display: grid; gap: 12px; border-top: 1px dashed var(--line); padding-top: 14px; min-width: 0; }
+.dish-title { font-size: 1.12rem; font-weight: 700; line-height: 1.3; }
+.meta { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.pill { font-size: 0.78rem; padding: 2px 9px; border-radius: 999px; background: var(--surface-2); color: var(--muted); font-weight: 500; }
+.pill.whey { background: var(--warn-soft); color: var(--warn); }
+.pill.prep { background: var(--accent-soft); color: var(--accent); }
+.dish-body { display: grid; gap: 14px; }
+@media (min-width: 640px) { .dish-body { grid-template-columns: minmax(0, 1fr) 210px; align-items: start; } }
+.ingr { list-style: none; margin: 0; padding: 0; display: grid; }
+.ingr li { display: flex; justify-content: space-between; gap: 12px; padding: 7px 0; border-bottom: 1px solid var(--line); }
+.ingr li:last-child { border-bottom: 0; }
+.ingr .nm { min-width: 0; }
+.ingr .es { display: block; font-size: 0.8rem; color: var(--muted); }
+.ingr .amt { font-family: var(--font-mono); font-variant-numeric: tabular-nums; font-size: 0.88rem; text-align: right; white-space: nowrap; }
+.ingr .amt small { display: block; font-family: var(--font-body); font-size: 0.76rem; color: var(--muted); }
+
+/* nutrition label */
+.nut { border: 2px solid var(--ink); padding: 6px 10px 8px; background: var(--surface); }
+.nut-h { font-weight: 800; font-size: 0.78rem; letter-spacing: 0.04em; text-transform: uppercase; border-bottom: 5px solid var(--ink); padding-bottom: 3px; }
+.nut-sub { font-size: 0.72rem; color: var(--muted); border-bottom: 1px solid var(--ink); padding: 3px 0; }
+.nut-row { display: flex; justify-content: space-between; gap: 8px; padding: 4px 0; border-bottom: 1px solid var(--line); font-size: 0.86rem; }
+.nut-row:last-child { border-bottom: 0; }
+.nut-row b { font-family: var(--font-mono); font-variant-numeric: tabular-nums; font-weight: 600; }
+.dot { display: inline-block; width: 8px; height: 8px; border-radius: 2px; margin-right: 6px; vertical-align: 1px; }
+.dot.p { background: var(--p); } .dot.f { background: var(--f); } .dot.c { background: var(--c); }
+
+.note { font-size: 0.9rem; color: var(--muted); border-left: 3px solid var(--line); padding-left: 10px; }
+details.how { border: 1px solid var(--line); border-radius: 8px; background: var(--bg); }
+details.how summary { cursor: pointer; padding: 9px 12px; font-weight: 600; font-size: 0.93rem; }
+details.how summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+details.how ol { margin: 0; padding: 0 14px 12px 34px; display: grid; gap: 6px; font-size: 0.93rem; }
+
+/* summary */
+.summary { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 16px; display: grid; gap: 14px; }
+.sum-k { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }
+.sum-k .big { font-family: var(--font-display); font-weight: 700; font-size: 2.1rem; line-height: 1; font-variant-numeric: tabular-nums; }
+.sum-k .unit { color: var(--muted); font-size: 0.9rem; }
+.bars { display: grid; gap: 10px; }
+.bar-row { display: grid; gap: 4px; }
+.bar-lbl { display: flex; justify-content: space-between; font-size: 0.86rem; }
+.bar-lbl b { font-family: var(--font-mono); font-weight: 600; font-variant-numeric: tabular-nums; }
+.bar { position: relative; height: 8px; border-radius: 999px; background: var(--surface-2); overflow: hidden; }
+.bar i { position: absolute; inset: 0 auto 0 0; border-radius: 999px; }
+.bar .tick { position: absolute; top: -2px; bottom: -2px; width: 2px; background: var(--ink); left: 80%; opacity: 0.55; }
+.bar-row.p i { background: var(--p); } .bar-row.f i { background: var(--f); } .bar-row.c i { background: var(--c); }
+.alerts { display: grid; gap: 8px; }
+.alert { font-size: 0.86rem; padding: 8px 10px; border-radius: 8px; background: var(--warn-soft); color: var(--warn); }
+.alert.info { background: var(--sun-soft); color: var(--sun); }
+.alert.ok { background: var(--accent-soft); color: var(--ink); }
+
+/* day products */
+.day-list { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 16px; display: grid; gap: 12px; }
+.day-list h2 { font-family: var(--font-display); font-weight: 500; font-size: 1.15rem; }
+.cats { display: grid; gap: 16px; }
+@media (min-width: 720px) { .cats { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+.cats h3 { font-size: 0.8rem; letter-spacing: 0.05em; text-transform: uppercase; color: var(--muted); font-weight: 600; margin-bottom: 4px; }
+
+/* shopping checklist */
+.chk { display: flex; align-items: center; gap: 12px; width: 100%; padding: 10px 0; background: none; border: 0; border-bottom: 1px solid var(--line); text-align: left; cursor: pointer; }
+.chk:last-child { border-bottom: 0; }
+.chk .bx { flex: 0 0 22px; height: 22px; border: 2px solid var(--muted); border-radius: 6px; display: grid; place-items: center; }
+.chk.done .bx { background: var(--c); border-color: var(--c); }
+.chk.done .bx::after { content: ""; width: 9px; height: 5px; border-left: 2px solid var(--surface); border-bottom: 2px solid var(--surface); transform: translateY(-1px) rotate(-45deg); }
+.chk .tx { flex: 1; min-width: 0; }
+.chk .tx b { display: block; font-weight: 500; }
+.chk .tx small { display: block; font-size: 0.8rem; color: var(--muted); }
+.chk .am { font-family: var(--font-mono); font-variant-numeric: tabular-nums; font-size: 0.88rem; text-align: right; white-space: nowrap; }
+.chk.done .tx b, .chk.done .am { text-decoration: line-through; color: var(--muted); }
+.chk:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+/* mobile bottom bar */
+.bottombar {
+  position: fixed; left: 0; right: 0; bottom: 0; z-index: 8;
+  background: var(--ink); color: var(--bg);
+  padding-top: 10px; padding-bottom: calc(10px + env(safe-area-inset-bottom, 0px));
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
+  display: flex; justify-content: space-between; align-items: center; gap: 10px; font-size: 0.88rem;
+}
+.bottombar b { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+.bottombar .mode { font-size: 0.75rem; padding: 2px 8px; border-radius: 999px; border: 1px solid currentColor; opacity: 0.85; white-space: nowrap; }
+body.has-bar main { padding-bottom: 96px; }
+@media (min-width: 960px) { .bottombar { display: none; } body.has-bar main { padding-bottom: 48px; } }
+
+/* prose views */
+.prose { display: grid; gap: 18px; max-width: 780px; }
+.prose h2 { font-family: var(--font-display); font-weight: 700; font-size: clamp(1.25rem, 3vw, 1.6rem); line-height: 1.2; }
+.prose h3 { font-size: 1.12rem; font-weight: 700; margin-top: 8px; }
+.prose p, .prose li { max-width: 68ch; }
+.prose ul { margin: 0; padding-left: 20px; display: grid; gap: 8px; }
+.prose .lede { color: var(--muted); font-size: 1.02rem; }
+.card { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 16px; display: grid; gap: 10px; }
+.card h3 { margin: 0; }
+.callout { background: var(--accent-soft); border-radius: var(--radius); padding: 14px 16px; }
+.table-wrap { overflow-x: auto; border: 1px solid var(--line); border-radius: var(--radius); background: var(--surface); }
+table { border-collapse: collapse; width: 100%; font-size: 0.92rem; }
+th, td { text-align: left; padding: 9px 12px; border-bottom: 1px solid var(--line); vertical-align: top; }
+thead th { font-size: 0.78rem; letter-spacing: 0.04em; text-transform: uppercase; color: var(--muted); font-weight: 600; background: var(--surface-2); }
+tbody tr:last-child td { border-bottom: 0; }
+td.num { font-family: var(--font-mono); font-variant-numeric: tabular-nums; white-space: nowrap; }
+td .better { color: var(--c); font-weight: 600; }
+.reason { display: grid; gap: 6px; padding: 14px 16px; background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); }
+.reason h3 { margin: 0; font-size: 1.05rem; }
+.reason .chg { font-family: var(--font-mono); font-size: 0.82rem; color: var(--muted); }
+.sources { font-size: 0.86rem; color: var(--muted); padding-left: 20px; display: grid; gap: 4px; }
+.shop { display: grid; gap: 14px; }
+@media (min-width: 760px) { .shop { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+.shop .card p { font-size: 0.95rem; }
+.shop .es { font-size: 0.85rem; color: var(--muted); }
+.lnks { display: flex; flex-wrap: wrap; gap: 8px; }
+.swap { display: grid; gap: 14px; }
+@media (min-width: 760px) { .swap { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+.swap ul { list-style: none; margin: 0; padding: 0; display: grid; }
+.swap li { display: flex; justify-content: space-between; gap: 10px; padding: 6px 0; border-bottom: 1px solid var(--line); font-size: 0.92rem; }
+.swap li:last-child { border-bottom: 0; }
+.swap li b { font-family: var(--font-mono); font-weight: 600; white-space: nowrap; }
+.field { display: flex; align-items: center; gap: 8px; padding: 9px 12px; border: 1px solid var(--line); border-radius: 8px; background: var(--bg); }
+.field label { color: var(--muted); font-size: 0.93rem; }
+.field input { flex: 1; min-width: 0; border: 0; background: none; color: var(--ink); font-family: var(--font-mono); font-size: 1rem; text-align: right; outline: none; }
+.field:focus-within { border-color: var(--accent); }
+.wrow { display: flex; justify-content: space-between; gap: 10px; padding: 7px 0; border-bottom: 1px solid var(--line); font-size: 0.93rem; }
+.wrow:last-child { border-bottom: 0; }
+.wrow b { font-family: var(--font-mono); font-weight: 600; }
+.dn { color: var(--c); } .upc { color: var(--warn); }
+.toast { position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(env(safe-area-inset-bottom, 0px) + 70px); z-index: 30; max-width: calc(100% - 32px);
+  padding: 10px 16px; border-radius: 999px; background: var(--ink); color: var(--bg); font-size: 0.9rem; font-weight: 600; box-shadow: 0 8px 24px rgb(0 0 0 / 0.2); }
+footer { color: var(--muted); font-size: 0.82rem; padding-block: 8px 28px; }
+@media (prefers-reduced-motion: no-preference) { .bar i { transition: width 0.25s ease; } }
+</style>
+</head>
+<body>
+<header class="wrap top">
+  <span class="eyebrow">Рекомпозиция · 4 приёма в день · калории по плану тренера</span>
+  <h1>Меню-конструктор</h1>
+  <p class="lede">Выбирай блюда сверху вниз: завтрак, потом обед, перекус и ужин. Каждый следующий приём подстраивается под выбранные выше, и день всегда сходится в норму тренера.</p>
+</header>
+
+<nav class="tabs" aria-label="Разделы">
+  <div class="wrap">
+    <a href="#menu" data-view="menu">Меню</a>
+    <a href="#pokupki" data-view="pokupki">Покупки</a>
+    <a href="#razbor" data-view="razbor">Разбор</a>
+    <a href="#pravila" data-view="pravila">Правила</a>
+  </div>
+</nav>
+
+<main class="wrap">
+
+<!-- ===================== MENU ===================== -->
+<section class="view" id="view-menu" data-view="menu">
+  <div class="daybar">
+    <div class="days" id="days" role="group" aria-label="День"></div>
+    <p class="dayinfo" id="dayinfo"></p>
+  </div>
+  <div class="controls">
+    <div class="check">
+      <input type="checkbox" id="has-whey"><label for="has-whey"><span class="box"></span>У меня есть протеин</label>
+    </div>
+    <button class="btn" id="shuffle" type="button">Собрать случайный день</button>
+  </div>
+  <p class="hint">Завтрак — как в рецепте. Обед подстраивается под завтрак, перекус — под завтрак и обед, ужин добирает остаток до нормы дня. Все граммы указаны для сырых продуктов.</p>
+
+  <div class="menu-grid">
+    <div class="slots" id="slots"></div>
+    <aside class="summary" id="summary" aria-live="polite"></aside>
+  </div>
+
+  <section class="day-list" id="day-list" aria-labelledby="day-list-h"></section>
+</section>
+
+<!-- ===================== POKUPKI ===================== -->
+<section class="view prose" id="view-pokupki" data-view="pokupki" hidden>
+  <h2>Покупки</h2>
+  <p class="lede">Список считается из меню на выбранные дни: сырой вес, на одного человека. Нажимай на продукт, когда положил его в корзину.</p>
+  <div class="controls" id="shop-ranges"></div>
+  <div class="card" id="shop-list"></div>
+  <button class="btn wide" id="shareShop" type="button">Переслать список в чат</button>
+  <h3>Что брать в Carrefour и Dia</h3>
+  <p class="hint">Рис, макароны, овсянку и томатное пюре можно брать любой марки, в том числе марки магазина. Ниже то, на что стоит смотреть внимательнее.</p>
+  <div class="shop" id="shop-products"></div>
+</section>
+
+<!-- ===================== RAZBOR ===================== -->
+<section class="view prose" id="view-razbor" data-view="razbor" hidden>
+  <h2>Разбор плана тренера</h2>
+  <p class="lede">Я пересчитал план по базе USDA и аргентинским этикеткам. Арифметика у тренера верная: около 205 г белка, 41 г жира, 2500 ккал в день тренировки и 2270 в день отдыха. Калории в меню оставил как у тренера, поменял состав.</p>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th></th><th>План тренера</th><th>Это меню</th></tr></thead>
+      <tbody>
+        <tr><td>Калории: тренировка / отдых</td><td class="num">2500 / 2270</td><td class="num">2486–2494 / 2262–2270</td></tr>
+        <tr><td>Белок</td><td class="num">203 г (2,5 г/кг)</td><td class="num">194–198 г (≈2,4 г/кг)</td></tr>
+        <tr><td>Жиры</td><td class="num">41 г (15% калорий)</td><td class="num"><span class="better">57–59 г (≈22%)</span></td></tr>
+        <tr><td>Углеводы: тренировка / отдых</td><td class="num">329 / 272 г</td><td class="num">292–299 / 238–243 г</td></tr>
+        <tr><td>Белок на завтрак</td><td class="num">≈22 г</td><td class="num"><span class="better">≈45 г</span></td></tr>
+        <tr><td>Обед и ужин</td><td>куриная грудка дважды в день</td><td><span class="better">9 блюд: курица, говядина, чёрная фасоль</span></td></tr>
+        <tr><td>Протеин</td><td>обязателен (30 г в перекусе)</td><td><span class="better">нужен в 2 перекусах из 7</span></td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p class="hint">Диапазоны покрывают все 3 969 возможных сочетаний блюд: порции подстраиваются, и ни один день не выходит за калории тренера. Калории везде считаются по формуле белки × 4 + жиры × 9 + углеводы × 4, как у тренера.</p>
+
+  <h3>Что поменял и почему</h3>
+  <div class="reason">
+    <h3>Жиры подняты до ≈58 г</h3>
+    <span class="chg">41 г → 57–59 г</span>
+    <p>41 г — это 15% калорий и 0,5 г на кг веса, самый низ того, что вообще рекомендуют. Совместная позиция ACSM и диетологов США и Канады: жиров не меньше 20% калорий. В мета-анализе Whittaker и Wu (2021: 6 контролируемых исследований, 206 мужчин) диеты с низким жиром снижали тестостерон, в среднем на 10–15%. И практическая причина: при 41 г жира почти нельзя есть говядину и целые яйца, отсюда однообразие.</p>
+  </div>
+  <div class="reason">
+    <h3>Белок около 195 г вместо 203 г</h3>
+    <span class="chg">2,5 г/кг → ≈2,4 г/кг</span>
+    <p>В мета-анализе Morton (2018, 49 исследований) польза белка для роста мышц выходит на плато около 1,6 г/кг, с запасом до 2,2 г/кг. В дефиците нужно больше: натуральным бодибилдерам на сушке советуют 2,3–3,1 г на кг сухой массы (Helms, 2014). Около 195 г — почти как у тренера и с запасом.</p>
+  </div>
+  <div class="reason">
+    <h3>Белок поровну: примерно 45–55 г в каждый приём</h3>
+    <span class="chg">завтрак 22 г → ≈45 г</span>
+    <p>Ориентир из обзора Schoenfeld и Aragon (2018): около 0,4 г на кг за приём, не меньше 4 раз в день. Миф «больше 30 г за раз не усвоится» опроверг Trommelen (2023), но ровный белок сытнее, и завтрак перестаёт быть слабым местом.</p>
+  </div>
+  <div class="reason">
+    <h3>Не только куриная грудка</h3>
+    <span class="chg">1 источник белка → курица, говядина, чёрная фасоль</span>
+    <p>Куриная грудка дважды в день быстро надоедает, а скука — главная причина срывов. В меню 9 обедов и ужинов: 6 с курицей, 3 с говядиной, в двух из них чёрная фасоль. Говядина даёт железо, цинк, B12 и природный креатин, а постные куски (nalga, peceto, cuadrada) по жиру близки к курице. Фасоль добавляет клетчатку.</p>
+  </div>
+  <div class="reason">
+    <h3>Разницу между днями тренировки и отдыха оставил</h3>
+    <span class="chg">+≈55 г углеводов в день тренировки</span>
+    <p>Главное — сумма калорий за неделю (позиция ISSN, Aragon 2017). Но схема удобная, поэтому в дни тренировок (пн, вт, чт, сб) гарнир в обеде и ужине больше. Граммы в меню уже посчитаны с этим.</p>
+  </div>
+
+  <h3>Дефицит и скорость</h3>
+  <p>С 10 000 шагов в день твоя поддержка около 2900–3100 ккал. План тренера в среднем за неделю даёт около 2400 ккал, то есть дефицит 500–700 ккал в день. Урезать сильнее не нужно:</p>
+  <ul>
+    <li>Мета-анализ Murphy и Koehler (2022): в дефиците мышцы растут хуже, чем на поддержке. Авторы советуют не уходить в дефицит глубже ≈500 ккал в день, если цель — сохранить или набрать мышцы.</li>
+    <li>Garthe (2011): спортсмены, которые худели медленно (0,7% веса в неделю), набрали сухую массу. Те, кто худел вдвое быстрее, не набрали.</li>
+    <li>Обзор Barakat (2020): рекомпозиция лучше всего идёт у новичков и у людей с запасом жира, если есть силовые, много белка и нормальный сон.</li>
+  </ul>
+
+  <h3>Дыры в плане, которые легко пропустить</h3>
+  <ul>
+    <li><b>Протеина нет.</b> Без 30 г протеина белок за день падает примерно до 180 г. В меню 5 из 7 перекусов обходятся без протеина.</li>
+    <li><b>«Греческий» йогурт в Аргентине часто не настоящий.</b> Yogurísimo Griego даёт около 8 г белка на порцию. Подходит Ser PRO+: 15 г белка в баночке.</li>
+    <li><b>2 г масла — меньше половины чайной ложки.</b> В обычной готовке уходит 10–15 г. В меню масло посчитано честно.</li>
+    <li><b>Сон.</b> Nedeltcheva (2010): в дефиците при 5,5 часа сна вместо 8,5 люди сбросили на 55% меньше жира и потеряли на 60% больше сухой массы.</li>
+  </ul>
+
+  <h3>Как понять, что всё работает</h3>
+  <ul>
+    <li>Взвешивайся каждое утро после туалета и смотри среднее за неделю. Записывать можно во вкладке «Правила».</li>
+    <li>Хороший темп: −0,4…−0,7 кг в неделю, талия уменьшается, силовые растут или держатся.</li>
+    <li>Быстрее 0,7 кг в неделю две недели подряд: добавь 150–200 ккал, это около 40 г риса или макарон.</li>
+    <li>Три недели не меняются ни вес, ни талия: убери 150 ккал, около 40 г гарнира в одном приёме.</li>
+    <li>Если креатин начал пить недавно, в первые 2–3 недели вес может прибавить 1–2 кг воды.</li>
+  </ul>
+  <div class="callout">Покажи этот разбор тренеру. Калории те же, поменялись только жиры, белок и продукты.</div>
+
+  <h3>Источники</h3>
+  <ol class="sources">
+    <li>Morton RW и др. Br J Sports Med, 2018 — <a href="https://doi.org/10.1136/bjsports-2017-097608" target="_blank" rel="noopener" data-link="https://doi.org/10.1136/bjsports-2017-097608">doi.org/10.1136/bjsports-2017-097608</a></li>
+    <li>Helms ER, Aragon AA, Fitschen PJ. J Int Soc Sports Nutr, 2014 — <a href="https://doi.org/10.1186/1550-2783-11-20" target="_blank" rel="noopener" data-link="https://doi.org/10.1186/1550-2783-11-20">doi.org/10.1186/1550-2783-11-20</a></li>
+    <li>Schoenfeld BJ, Aragon AA. J Int Soc Sports Nutr, 2018 — <a href="https://doi.org/10.1186/s12970-018-0215-1" target="_blank" rel="noopener" data-link="https://doi.org/10.1186/s12970-018-0215-1">doi.org/10.1186/s12970-018-0215-1</a></li>
+    <li>Trommelen J и др. Cell Reports Medicine, 2023 — <a href="https://doi.org/10.1016/j.xcrm.2023.101324" target="_blank" rel="noopener" data-link="https://doi.org/10.1016/j.xcrm.2023.101324">doi.org/10.1016/j.xcrm.2023.101324</a></li>
+    <li>Whittaker J, Wu K. J Steroid Biochem Mol Biol, 2021 — <a href="https://doi.org/10.1016/j.jsbmb.2021.105878" target="_blank" rel="noopener" data-link="https://doi.org/10.1016/j.jsbmb.2021.105878">doi.org/10.1016/j.jsbmb.2021.105878</a></li>
+    <li>Thomas DT, Erdman KA, Burke LM. Med Sci Sports Exerc, 2016 — <a href="https://doi.org/10.1249/MSS.0000000000000852" target="_blank" rel="noopener" data-link="https://doi.org/10.1249/MSS.0000000000000852">doi.org/10.1249/MSS.0000000000000852</a></li>
+    <li>Murphy C, Koehler K. Scand J Med Sci Sports, 2022 — <a href="https://doi.org/10.1111/sms.14075" target="_blank" rel="noopener" data-link="https://doi.org/10.1111/sms.14075">doi.org/10.1111/sms.14075</a></li>
+    <li>Garthe I и др. Int J Sport Nutr Exerc Metab, 2011 — <a href="https://doi.org/10.1123/ijsnem.21.2.97" target="_blank" rel="noopener" data-link="https://doi.org/10.1123/ijsnem.21.2.97">doi.org/10.1123/ijsnem.21.2.97</a></li>
+    <li>Barakat C и др. Strength Cond J, 2020 — <a href="https://doi.org/10.1519/SSC.0000000000000584" target="_blank" rel="noopener" data-link="https://doi.org/10.1519/SSC.0000000000000584">doi.org/10.1519/SSC.0000000000000584</a></li>
+    <li>Aragon AA и др. Позиция ISSN: диеты и состав тела, 2017 — <a href="https://doi.org/10.1186/s12970-017-0174-y" target="_blank" rel="noopener" data-link="https://doi.org/10.1186/s12970-017-0174-y">doi.org/10.1186/s12970-017-0174-y</a></li>
+    <li>Nedeltcheva AV и др. Ann Intern Med, 2010 — <a href="https://doi.org/10.7326/0003-4819-153-7-201010050-00006" target="_blank" rel="noopener" data-link="https://doi.org/10.7326/0003-4819-153-7-201010050-00006">doi.org/10.7326/0003-4819-153-7-201010050-00006</a></li>
+    <li>Antonio J и др. Мифы о креатине, 2021 — <a href="https://doi.org/10.1186/s12970-021-00412-w" target="_blank" rel="noopener" data-link="https://doi.org/10.1186/s12970-021-00412-w">doi.org/10.1186/s12970-021-00412-w</a></li>
+  </ol>
+</section>
+
+<!-- ===================== PRAVILA ===================== -->
+<section class="view prose" id="view-pravila" data-view="pravila" hidden>
+  <h2>Правила и замены</h2>
+
+  <div class="card">
+    <h3>Дни тренировок</h3>
+    <p>В эти дни гарнир в обеде и ужине больше. Приложение само смотрит на день недели.</p>
+    <div class="chips" id="tdays"></div>
+  </div>
+
+  <div class="card">
+    <h3>Как пользоваться меню</h3>
+    <ul>
+      <li>Каждый день: один завтрак, один обед, один перекус и один ужин. Обед и ужин выбираются из одного списка.</li>
+      <li>Выбирай сверху вниз. Завтрак — как в рецепте, обед подстраивается под завтрак, перекус — под завтрак и обед, ужин добирает остаток. Любой день выходит 2262–2270 ккал в отдых и 2486–2494 ккал в тренировку, белок 194–198 г.</li>
+      <li>Если ничего не менять, каждый день подставляется разное меню само.</li>
+      <li>Мясо, крупы, макароны и картофель взвешиваются сырыми, на кухонных весах.</li>
+    </ul>
+  </div>
+
+  <div class="card">
+    <h3>Если готовишь сразу на всю семью</h3>
+    <p>Взвесь готовую порцию по таблице. Цифры примерные: многое зависит от того, сколько варить.</p>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Продукт</th><th>Сырое → готовое</th><th>Пример</th></tr></thead>
+        <tbody>
+          <tr><td>Рис</td><td class="num">× 3</td><td class="num">55 г → 165 г</td></tr>
+          <tr><td>Макароны</td><td class="num">× 2,3</td><td class="num">60 г → 140 г</td></tr>
+          <tr><td>Куриная грудка</td><td class="num">× 0,75</td><td class="num">200 г → 150 г</td></tr>
+          <tr><td>Говядина</td><td class="num">× 0,7</td><td class="num">200 г → 140 г</td></tr>
+          <tr><td>Картофель варёный / запечённый</td><td class="num">× 1 / × 0,8</td><td class="num">300 г → 300 / 240 г</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="card">
+    <h3>Молоко с повышенным белком: какое</h3>
+    <p>В обычном молоке около 3 г белка на 100 мл. «Повышенный белок» — от 5 г на 100 мл. La Serenísima Protein: 5,2 г на 100 мл, это 10 г белка в стакане, 0% жира, без лактозы. На этикетке смотри строку «Proteínas».</p>
+  </div>
+
+  <div class="card">
+    <h3>Масло и «бесплатные» продукты</h3>
+    <ul>
+      <li>1 чайная ложка масла — около 5 г, столовая — около 13 г. Масло мерь всегда: это самый частый источник лишних калорий.</li>
+      <li>Без ограничений: овощи и салат без масла, специи, чеснок, зелень, лимон, уксус, горчица, подсластитель.</li>
+      <li>Напитки: вода, мате, кофе и чай без сахара. Газировка только zero.</li>
+    </ul>
+  </div>
+
+  <h3>Замены внутри блюда</h3>
+  <div class="swap">
+    <div class="card">
+      <h3>Гарнир, ≈50 г углеводов</h3>
+      <ul>
+        <li><span>Рис</span><b>60 г</b></li>
+        <li><span>Макароны</span><b>70 г</b></li>
+        <li><span>Овсянка</span><b>75 г</b></li>
+        <li><span>Картофель</span><b>285 г</b></li>
+        <li><span>Хлеб цельнозерновой</span><b>115 г</b></li>
+      </ul>
+    </div>
+    <div class="card">
+      <h3>Мясо, ≈30 г белка</h3>
+      <ul>
+        <li><span>Куриная грудка</span><b>135 г</b></li>
+        <li><span>Nalga, peceto</span><b>135 г</b></li>
+      </ul>
+      <p class="hint">Говядина жирнее грудки на 2–3 г. Если меняешь курицу на говядину, убери ½ ч. л. масла.</p>
+    </div>
+    <div class="card">
+      <h3>Фрукт, ≈25 г углеводов</h3>
+      <ul>
+        <li><span>Банан</span><b>110 г</b></li>
+        <li><span>Яблоко</span><b>180 г</b></li>
+        <li><span>Апельсин</span><b>210 г</b></li>
+        <li><span>Мандарины</span><b>190 г</b></li>
+        <li><span>Клубника</span><b>320 г</b></li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="card">
+    <h3>Тренировка, шаги и сон</h3>
+    <ul>
+      <li>Последний приём за 1,5–3 часа до тренировки, следующий в пределах пары часов после.</li>
+      <li>10 000 шагов каждый день уже учтены в расчёте калорий.</li>
+      <li>Сон 8–9 часов. Креатин 3–5 г каждый день, время не важно.</li>
+      <li>Раз в неделю можно один обед или ужин вне меню, без «наесться впрок».</li>
+    </ul>
+  </div>
+
+  <div class="card">
+    <h3>Вес по неделям</h3>
+    <div class="field"><label for="wIn">Вес сегодня утром, кг</label><input id="wIn" type="text" inputmode="decimal" placeholder="82,5"></div>
+    <div id="weights"></div>
+  </div>
+</section>
+
+</main>
+
+<footer class="wrap">Белки, жиры и углеводы посчитаны по базе USDA FoodData Central и этикеткам аргентинских продуктов, калории — по формуле Б × 4 + Ж × 9 + У × 4; у конкретной марки цифры могут немного отличаться. Это ориентир для здорового человека. Если есть проблемы со здоровьем, согласуй питание с врачом.</footer>
+
+<div class="bottombar" id="bottombar"></div>
+<div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
+
+<script>
+(function () {
+  "use strict";
+  var tg = window.Telegram && window.Telegram.WebApp;
+  var inTG = !!(tg && tg.platform && tg.platform !== "unknown");
+  function applyTheme() {
+    if (!inTG) return;
+    var dark = tg.colorScheme === "dark";
+    document.documentElement.setAttribute("data-theme", dark ? "dark" : "light");
+    try { var c = dark ? "#0D151B" : "#F1F4F6"; tg.setHeaderColor(c); tg.setBackgroundColor(c); } catch (e) {}
+  }
+  if (inTG) {
+    try { tg.ready(); tg.expand(); } catch (e) {}
+    applyTheme();
+    try { tg.onEvent("themeChanged", applyTheme); } catch (e) {}
+  }
+  function hap(t) { try { tg.HapticFeedback.impactOccurred(t || "light"); } catch (e) {} }
+
+  var DATA = {"v":3,"updated":"2026-10-29","targets":{"breakfast":{"P":45,"F":16,"C":70},"main":{"P":52,"F":16,"C":58},"snack":{"P":46,"F":10,"C":56}},"trainExtraC":28,"dayTargets":{"rest":{"P":195,"F":58,"C":242,"k":2270},"train":{"P":195,"F":58,"C":298,"k":2500}},"tags":{"whey":"нужен протеин","ham":"ветчина","prep":"с вечера","batch":"можно на 3 дня","trainer":"из плана тренера"},"foods":{"oats":{"ru":"Овсяные хлопья","es":"Avena arrollada","sh":"овсянка","cat":"Крупы, фасоль, хлеб","p":13.2,"f":6.5,"c":67.7,"role":"C","step":5},"flour":{"ru":"Мука пшеничная","es":"Harina de trigo 000","sh":"мука","cat":"Крупы, фасоль, хлеб","p":10.3,"f":1.0,"c":76.3},"rice":{"ru":"Рис (сухой, до варки)","es":"Arroz largo fino","sh":"рис","cat":"Крупы, фасоль, хлеб","p":7.1,"f":0.7,"c":80.0,"role":"C","step":5},"pasta":{"ru":"Макароны (сухие, до варки)","es":"Fideos secos de sémola","sh":"макароны","cat":"Крупы, фасоль, хлеб","p":12.5,"f":1.5,"c":73.0,"role":"C","step":5},"potato":{"ru":"Картофель (сырой)","es":"Papa","sh":"картофель","cat":"Овощи и фрукты","p":2.0,"f":0.1,"c":17.5,"role":"C","step":10,"hh":{"k":"pc","g":150,"q":2,"f":["картофелина","картофелины","картофелин"]}},"bread_ww":{"ru":"Хлеб цельнозерновой тостовый","es":"Pan lactal integral","sh":"хлеб","cat":"Крупы, фасоль, хлеб","p":11.0,"f":3.5,"c":43.0,"u":"slice","ug":27},"tortilla":{"ru":"Тортилья пшеничная","es":"Rapiditas","sh":"тортилья","cat":"Крупы, фасоль, хлеб","p":8.5,"f":10.0,"c":47.7,"u":"pcs","ug":26},"peas":{"ru":"Зелёный горошек","es":"Arvejas","sh":"горошек","cat":"Крупы, фасоль, хлеб","p":5.4,"f":0.4,"c":14.5,"hh":{"k":"sp","g":15,"s":"ст. л."}},"beans":{"ru":"Фасоль чёрная (сухая, до варки)","es":"Porotos negros secos","sh":"фасоль чёрная (сухая)","cat":"Крупы, фасоль, хлеб","p":21.6,"f":1.4,"c":62.4,"role":"C","step":5},"chicken":{"ru":"Куриная грудка (сырая)","es":"Pechuga de pollo","sh":"куриная грудка","cat":"Мясо и птица","p":22.5,"f":2.6,"c":0.0,"role":"P","step":5},"beef":{"ru":"Говядина постная: nalga, peceto, cuadrada","es":"Nalga / peceto / cuadrada","sh":"говядина (nalga)","cat":"Мясо и птица","p":22.0,"f":4.5,"c":0.0,"role":"P","step":5},"egg":{"ru":"Яйцо","es":"Huevo","sh":"яйца","cat":"Яйца и молочное","p":12.6,"f":9.5,"c":0.7,"u":"egg","ug":50},"egg_white":{"ru":"Яичный белок","es":"Clara de huevo","sh":"","cat":"Яйца и молочное","p":10.9,"f":0.2,"c":0.7,"u":"white","ug":33},"ham":{"ru":"Ветчина варёная","es":"Jamón cocido natural","sh":"ветчина","cat":"Мясо и птица","p":18.0,"f":5.0,"c":1.0,"role":"P","step":5,"hh":{"k":"pc","g":20,"q":2,"f":["ломтик","ломтика","ломтиков"]}},"cheese":{"ru":"Сыр лёгкий в ломтиках","es":"Queso light en fetas","sh":"сыр","cat":"Яйца и молочное","p":23.0,"f":16.0,"c":2.0,"hh":{"k":"pc","g":20,"q":2,"f":["ломтик","ломтика","ломтиков"]}},"parmesan":{"ru":"Сыр тёртый","es":"Queso rallado","sh":"тёртый сыр","cat":"Яйца и молочное","p":33.0,"f":28.0,"c":2.0,"hh":{"k":"sp","g":5,"s":"ст. л."}},"ricotta":{"ru":"Рикотта обезжиренная (наш творог)","es":"Ricotta magra / descremada","sh":"рикотта","cat":"Яйца и молочное","p":12.0,"f":4.0,"c":6.0,"role":"P","step":5},"yogurt":{"ru":"Йогурт Ser PRO+ натуральный","es":"Yogur Ser PRO+ batido natural","sh":"йогурт Ser PRO+","cat":"Яйца и молочное","p":8.6,"f":1.1,"c":8.0,"u":"pot","ug":175},"milk":{"ru":"Молоко La Serenísima Protein","es":"Leche Protein La Serenísima","sh":"молоко Protein","cat":"Яйца и молочное","p":5.2,"f":0.1,"c":4.6,"role":"P","step":10,"u":"ml","ug":1},"milk_powder":{"ru":"Сухое обезжиренное молоко","es":"Leche en polvo descremada","sh":"сухое молоко","cat":"Яйца и молочное","p":35.0,"f":1.0,"c":52.0,"role":"P","step":5,"hh":{"k":"sp","g":8,"s":"ст. л."}},"whey":{"ru":"Сывороточный протеин","es":"Whey protein","sh":"протеин","cat":"Яйца и молочное","p":75.0,"f":6.0,"c":9.0,"role":"P","step":5,"u":"scoop","ug":30},"banana":{"ru":"Банан","es":"Banana","sh":"банан","cat":"Овощи и фрукты","p":1.1,"f":0.3,"c":22.8,"role":"C","step":10,"hh":{"k":"pc","g":120,"q":2,"main":1,"f":["банан","банана","бананов"]}},"apple":{"ru":"Яблоко","es":"Manzana","sh":"яблоко","cat":"Овощи и фрукты","p":0.3,"f":0.2,"c":13.8,"role":"C","step":10,"hh":{"k":"pc","g":200,"q":2,"main":1,"f":["яблоко","яблока","яблок"]}},"orange":{"ru":"Апельсин","es":"Naranja","sh":"апельсин","cat":"Овощи и фрукты","p":0.9,"f":0.1,"c":11.8,"role":"C","step":10,"hh":{"k":"pc","g":150,"q":2,"main":1,"f":["апельсин","апельсина","апельсинов"]}},"strawberry":{"ru":"Клубника (можно замороженную)","es":"Frutillas","sh":"клубника","cat":"Овощи и фрукты","p":0.7,"f":0.3,"c":7.7,"role":"C","step":10,"hh":{"k":"pc","g":15,"q":1,"f":["ягода","ягоды","ягод"]}},"veg_mix":{"ru":"Овощи: морковь, лук, помидоры","es":"Zanahoria, cebolla, tomate","sh":"овощи","cat":"Овощи и фрукты","p":1.0,"f":0.2,"c":7.6,"hh":{"k":"more"}},"salad":{"ru":"Салат: помидор, огурец, листья, лук","es":"Ensalada","sh":"салат","cat":"Овощи и фрукты","p":0.9,"f":0.2,"c":3.8,"hh":{"k":"more"}},"cabbage":{"ru":"Капуста белокочанная","es":"Repollo","sh":"капуста","cat":"Овощи и фрукты","p":1.3,"f":0.1,"c":5.8},"onion":{"ru":"Лук","es":"Cebolla","sh":"лук","cat":"Овощи и фрукты","p":1.1,"f":0.1,"c":9.3,"hh":{"k":"pc","g":100,"q":4,"f":["луковица","луковицы","луковиц"]}},"carrot":{"ru":"Морковь","es":"Zanahoria","sh":"морковь","cat":"Овощи и фрукты","p":0.9,"f":0.2,"c":9.6,"hh":{"k":"pc","g":90,"q":4,"f":["морковка","морковки","морковок"]}},"tomato_puree":{"ru":"Томатное пюре","es":"Puré de tomate","sh":"томатное пюре","cat":"Овощи и фрукты","p":1.6,"f":0.2,"c":9.0,"hh":{"k":"sp","g":17,"s":"ст. л.","max":60}},"oil":{"ru":"Масло растительное","es":"Aceite (oliva o girasol)","sh":"масло","cat":"Прочее","p":0.0,"f":100.0,"c":0.0,"role":"F","step":1,"u":"oil","ug":1,"hh":{"k":"sp","g":5,"s":"ч. л."}},"peanut_butter":{"ru":"Арахисовая паста","es":"Mantequilla de maní","sh":"арахисовая паста","cat":"Прочее","p":25.0,"f":50.0,"c":20.0,"role":"F","step":1,"hh":{"k":"sp","g":7,"s":"ч. л."}},"walnuts":{"ru":"Грецкие орехи","es":"Nueces","sh":"орехи","cat":"Прочее","p":15.2,"f":65.2,"c":13.7,"role":"F","step":1,"hh":{"k":"pc","g":2.5,"q":1,"f":["половинка","половинки","половинок"]}},"chia":{"ru":"Семена чиа","es":"Chía","sh":"чиа","cat":"Прочее","p":16.5,"f":30.7,"c":42.1,"hh":{"k":"sp","g":10,"s":"ст. л."}},"honey":{"ru":"Мёд","es":"Miel","sh":"мёд","cat":"Прочее","p":0.3,"f":0.0,"c":82.4,"hh":{"k":"sp","g":7,"s":"ч. л."}},"cocoa":{"ru":"Какао без сахара","es":"Cacao amargo","sh":"какао","cat":"Прочее","p":19.6,"f":13.7,"c":57.9,"hh":{"k":"sp","g":5,"s":"ст. л."}}},"options":[{"id":"B1","pool":"breakfast","name":"Овсянка на молоке, омлет и банан","time":10,"tags":["trainer"],"items":{"oats":55,"milk":250,"egg":150,"egg_white":33,"banana":70},"train":{},"steps":["Овсянку залей молоком и вари 3–5 минут (или 2 минуты в микроволновке). Корица и подсластитель по вкусу.","Яйца и белок взбей со щепоткой соли. Жарь на антипригарной сковороде без масла.","Банан нарежь в кашу."],"note":"Завтрак тренера, только на молоке Protein и с 3 яйцами: белка около 45 г вместо 22 г.","what":"яйца, овсянка, молоко","m":{"k":602,"p":44,"f":18,"c":66},"mt":{"k":602,"p":44,"f":18,"c":66},"short":"Овсянка + омлет"},{"id":"B2","pool":"breakfast","name":"Сырники с йогуртом и клубникой","time":25,"tags":[],"items":{"ricotta":220,"egg":50,"flour":35,"oil":2,"yogurt":100,"strawberry":150,"honey":5},"train":{},"steps":["Рикотту откинь на сито на 10–15 минут, чтобы ушла лишняя влага.","Смешай рикотту, яйцо, муку, ваниль, щепотку соли и подсластитель. Если тесто липнет к рукам, добавь ещё ложку муки из этой же порции.","Слепи 6–8 сырников и обваляй в муке. Жарь на ½ ч. л. масла на антипригарной сковороде по 3–4 минуты с каждой стороны на среднем огне. Или запекай 20 минут при 190 °C.","Подавай с йогуртом, клубникой и мёдом."],"note":"","what":"рикотта, яйца, йогурт","m":{"k":593,"p":46,"f":17,"c":64},"mt":{"k":593,"p":46,"f":17,"c":64},"short":"Сырники"},{"id":"B3","pool":"breakfast","name":"Блинчики с рикоттой и бананом","time":25,"tags":[],"items":{"flour":50,"milk":150,"egg":50,"egg_white":33,"oil":3,"ricotta":180,"honey":3,"banana":50},"train":{},"steps":["Тесто: молоко, яйцо, белок, мука, щепотка соли и подсластителя, ½ ч. л. масла. Взбей до гладкости и дай постоять 10 минут.","Жарь тонкие блинчики на сухой антипригарной сковороде, по минуте с каждой стороны. Выйдет 4–5 штук.","Начинка: рикотта с ванилью, подсластителем и мёдом. Заверни блинчики, сверху нарезанный банан."],"note":"","what":"рикотта, яйца, молоко","m":{"k":604,"p":45,"f":16,"c":70},"mt":{"k":604,"p":45,"f":16,"c":70},"short":"Блинчики"},{"id":"B4","pool":"breakfast","name":"Горячие бутерброды с ветчиной и сыром, омлет и апельсин","time":10,"tags":["ham"],"items":{"bread_ww":108,"ham":60,"cheese":30,"egg":50,"egg_white":66,"orange":150},"train":{},"steps":["Собери 2 бутерброда: 4 ломтика хлеба, ветчина и сыр.","Подрумянь в бутерброднице или на сухой сковороде под крышкой 3–4 минуты.","Из 1 яйца и 2 белков сделай омлет на сухой сковороде. Апельсин съешь целиком."],"note":"","what":"ветчина, яйца, хлеб","m":{"k":593,"p":44,"f":17,"c":66},"mt":{"k":593,"p":44,"f":17,"c":66},"short":"Горячие бутерброды"},{"id":"B5","pool":"breakfast","name":"Омлет с помидорами, тосты, стакан молока и банан","time":10,"tags":[],"items":{"egg":150,"egg_white":66,"salad":150,"bread_ww":54,"milk":250,"banana":100},"train":{},"steps":["Помидоры и лук нарежь, прогрей на сухой сковороде 2 минуты.","Залей взбитыми яйцами и белками с солью и зеленью, накрой крышкой на 4–5 минут.","К омлету 2 подсушенных тоста, стакан (250 мл) молока и банан."],"note":"","what":"яйца, хлеб, молоко","m":{"k":601,"p":47,"f":17,"c":65},"mt":{"k":601,"p":47,"f":17,"c":65},"short":"Омлет + тосты"},{"id":"B6","pool":"breakfast","name":"Ленивая овсянка в банке","time":5,"tags":["prep"],"items":{"oats":35,"yogurt":175,"milk":150,"milk_powder":25,"chia":10,"strawberry":100,"peanut_butter":15},"train":{},"steps":["Вечером сложи в банку овсянку, йогурт, молоко, сухое молоко, чиа, ваниль и подсластитель. Перемешай, закрой и убери в холодильник.","Утром положи сверху клубнику и арахисовую пасту. Можно есть холодной или погреть минуту."],"note":"","what":"овсянка, йогурт, молоко","m":{"k":595,"p":42,"f":15,"c":73},"mt":{"k":595,"p":42,"f":15,"c":73},"short":"Овсянка в банке"},{"id":"B7","pool":"breakfast","name":"Овсяные оладьи с бананом и йогуртом","time":15,"tags":[],"items":{"oats":40,"banana":100,"egg":100,"egg_white":66,"milk":50,"oil":2,"yogurt":175},"train":{},"steps":["В блендер: овсянка, банан, 2 яйца, 2 белка, 50 мл молока, корица, ½ ч. л. разрыхлителя (polvo de hornear).","Жарь небольшие оладьи на ½ ч. л. масла по 1–2 минуты с каждой стороны.","Подавай с йогуртом."],"note":"","what":"яйца, овсянка, йогурт","m":{"k":597,"p":44,"f":17,"c":67},"mt":{"k":597,"p":44,"f":17,"c":67},"short":"Овсяные оладьи"},{"id":"S1","pool":"snack","name":"Йогурт с протеином, яблоко и орехи","time":5,"tags":["whey","trainer"],"items":{"yogurt":175,"whey":35,"milk_powder":10,"apple":200,"walnuts":10},"train":{},"steps":["Размешай в йогурте протеин и сухое молоко до крема. Если слишком густо, добавь ложку воды.","Яблоко нарежь кубиками, сверху орехи и корица."],"note":"Перекус тренера. Без протеина его не собрать: выбирай другой вариант.","what":"йогурт, яблоко, протеин","m":{"k":491,"p":47,"f":11,"c":51},"mt":{"k":491,"p":47,"f":11,"c":51},"short":"Йогурт + протеин"},{"id":"S2","pool":"snack","name":"Творожный крем с клубникой","time":5,"tags":[],"items":{"ricotta":200,"yogurt":175,"milk_powder":20,"strawberry":180},"train":{},"steps":["Взбей рикотту с йогуртом, сухим молоком, ванилью и подсластителем блендером или вилкой до крема.","Сверху клубника. По вкусу как творожный десерт."],"note":"","what":"рикотта, йогурт, клубника","m":{"k":487,"p":47,"f":11,"c":50},"mt":{"k":487,"p":47,"f":11,"c":50},"short":"Творожный крем"},{"id":"S3","pool":"snack","name":"Домашняя шаурма с курицей","time":15,"tags":[],"items":{"tortilla":52,"chicken":150,"cabbage":60,"salad":80,"yogurt":60,"orange":150},"train":{},"steps":["Курицу нарежь полосками, приправь паприкой, кумином, чесноком и солью, обжарь на сухой сковороде 6–7 минут. Удобно сделать заранее, вместе с обедом.","Соус: йогурт, тёртый чеснок, соль, зелень.","Тортильи прогрей, внутрь капусту, помидор, огурец, курицу и соус. Сверни. Апельсин отдельно."],"note":"","what":"курица, капуста, тортильи","m":{"k":490,"p":46,"f":10,"c":54},"mt":{"k":490,"p":46,"f":10,"c":54},"short":"Шаурма"},{"id":"S4","pool":"snack","name":"Молочный коктейль банан-какао","time":5,"tags":[],"items":{"milk":300,"yogurt":175,"banana":60,"milk_powder":25,"peanut_butter":12,"cocoa":5},"train":{},"steps":["В блендер: молоко, йогурт, банан (лучше замороженный), сухое молоко, арахисовая паста, какао и пара кубиков льда.","30 секунд, и готово. Подсластитель по вкусу."],"note":"","what":"йогурт, молоко, банан","m":{"k":497,"p":44,"f":9,"c":60},"mt":{"k":497,"p":44,"f":9,"c":60},"short":"Коктейль банан-какао"},{"id":"S5","pool":"snack","name":"Протеиновое мороженое","time":10,"tags":["whey","prep"],"items":{"yogurt":175,"whey":30,"milk_powder":10,"strawberry":150,"banana":85,"peanut_butter":10},"train":{},"steps":["Клубнику и банан нарежь и заморозь заранее.","В блендере пробей замороженные фрукты с йогуртом, протеином и сухим молоком до мягкого мороженого.","Сверху арахисовая паста. Если вышло жидко, убери в морозилку на 20–30 минут."],"note":"","what":"йогурт, банан, клубника","m":{"k":494,"p":46,"f":10,"c":55},"mt":{"k":494,"p":46,"f":10,"c":55},"short":"Мороженое"},{"id":"S6","pool":"snack","name":"Творожная запеканка и стакан молока","time":40,"tags":["batch"],"items":{"ricotta":200,"egg_white":66,"oats":25,"banana":60,"honey":5,"milk":200},"train":{},"steps":["Смешай рикотту, белки, овсянку, размятый банан, мёд и ваниль.","Выложи в форму и запекай 30–35 минут при 180 °C. Удобно испечь сразу на 3 дня: умножь всё на 3.","К кусочку запеканки молоко: сколько указано в продуктах."],"note":"","what":"рикотта, молоко, банан","m":{"k":498,"p":46,"f":10,"c":56},"mt":{"k":498,"p":46,"f":10,"c":56},"short":"Запеканка"},{"id":"S7","pool":"snack","name":"Бутерброд с ветчиной, молоко и яблоко","time":3,"tags":["ham"],"items":{"bread_ww":54,"ham":100,"cheese":20,"salad":50,"milk":300,"apple":100},"train":{},"steps":["2 ломтика хлеба, ветчина, сыр, лист салата и помидор.","Молоко и яблоко: сколько указано в продуктах."],"note":"","what":"ветчина, хлеб, молоко","m":{"k":495,"p":45,"f":11,"c":54},"mt":{"k":495,"p":45,"f":11,"c":54},"short":"Бутерброд + молоко"},{"id":"M1","pool":"main","name":"Курица с рисом и овощами","time":25,"tags":["trainer"],"items":{"chicken":195,"rice":53,"veg_mix":200,"oil":10},"train":{"rice":30},"steps":["Рис отвари: готового получится примерно в 3 раза больше, чем сухого.","Курицу нарежь и обжарь на половине масла с чесноком и паприкой.","Добавь нарезанные морковь, лук и помидоры и туши 5–7 минут. Остальное масло добавь в овощи в конце."],"note":"Обед тренера, только курицы чуть меньше, а масла больше.","what":"курица, рис","m":{"k":576,"p":50,"f":16,"c":58},"mt":{"k":680,"p":52,"f":16,"c":82},"short":"Курица + рис"},{"id":"M2","pool":"main","name":"Макароны с курицей и овощами","time":25,"tags":["trainer"],"items":{"chicken":180,"pasta":58,"veg_mix":200,"oil":8,"parmesan":5},"train":{"pasta":30},"steps":["Макароны отвари: готовых получится примерно в 2 раза больше, чем сухих.","Курицу кубиками обжарь на масле с чесноком, добавь морковь, лук и помидоры, туши 5 минут.","Смешай с макаронами, сверху тёртый сыр и зелень."],"note":"Ужин тренера с овощами в одной сковороде.","what":"курица, макароны","m":{"k":571,"p":51,"f":15,"c":58},"mt":{"k":684,"p":55,"f":16,"c":80},"short":"Макароны с курицей"},{"id":"M3","pool":"main","name":"Куриные котлеты с пюре и салатом","time":40,"tags":["batch"],"items":{"chicken":170,"onion":40,"egg_white":33,"oats":15,"oil":10,"potato":200,"milk":50,"salad":150},"train":{"potato":150},"steps":["Грудку прокрути в фарш, добавь мелко натёртый лук, белок, овсяные хлопья, соль, перец и зелень. Дай постоять 10 минут.","Слепи 3–4 котлеты, обжарь на половине масла по минуте с каждой стороны и доведи в духовке 15 минут при 190 °C.","Пюре: картофель отвари и разомни с горячим молоком и остальным маслом. Салат без масла."],"note":"","what":"курица, картошка","m":{"k":580,"p":52,"f":16,"c":57},"mt":{"k":696,"p":55,"f":16,"c":83},"short":"Котлеты + пюре"},{"id":"M4","pool":"main","name":"Курица с картошкой в духовке","time":50,"tags":[],"items":{"chicken":200,"potato":270,"onion":50,"carrot":60,"oil":10},"train":{"potato":150},"steps":["Картофель, лук и морковь нарежь и перемешай с маслом, солью, паприкой и чесноком.","Сверху выложи кусочки грудки, посоли и накрой фольгой, чтобы грудка осталась сочной.","200 °C: 30 минут под фольгой, потом 10–15 минут без неё."],"note":"","what":"курица, картошка","m":{"k":580,"p":51,"f":16,"c":58},"mt":{"k":696,"p":54,"f":16,"c":84},"short":"Курица с картошкой"},{"id":"M5","pool":"main","name":"Рис с курицей на одной сковородке","time":35,"tags":[],"items":{"chicken":200,"rice":47,"onion":50,"carrot":50,"peas":40,"tomato_puree":50,"oil":9},"train":{"rice":30},"steps":["Грудку кубиками обжарь на масле, добавь лук и тёртую морковь.","Всыпь сухой рис, томатное пюре, горошек, куркуму и соль. Воды налей примерно в 3 раза больше, чем риса по весу.","Туши под крышкой 18–20 минут, пока рис не впитает воду."],"note":"","what":"курица, рис","m":{"k":571,"p":52,"f":15,"c":57},"mt":{"k":675,"p":54,"f":15,"c":81},"short":"Рис с курицей"},{"id":"M7","pool":"main","name":"Бефстроганов с рисом","time":35,"tags":[],"items":{"beef":180,"onion":70,"flour":5,"oil":5,"yogurt":60,"rice":50,"salad":150},"train":{"rice":30},"steps":["Говядину нарежь тонкими полосками и обжарь на масле на сильном огне 3–4 минуты.","Добавь лук полукольцами, посыпь мукой, влей полстакана воды и туши 15–20 минут.","Сними с огня и вмешай йогурт вместо сметаны. Не кипяти, иначе свернётся.","Подавай с рисом и салатом или солёными огурцами."],"note":"","what":"говядина, рис","m":{"k":583,"p":51,"f":15,"c":61},"mt":{"k":687,"p":53,"f":15,"c":85},"short":"Бефстроганов"},{"id":"M10","pool":"main","name":"Отбивные из говядины с картофелем и салатом","time":35,"tags":[],"items":{"beef":200,"potato":280,"oil":6,"salad":200},"train":{"potato":150},"steps":["Говядину нарежь пластами, отбей, посоли и поперчи.","Обжарь на половине масла по 2–3 минуты с каждой стороны.","Картофель отвари с укропом. Салат заправь остатком масла и лимоном."],"note":"","what":"говядина, картошка","m":{"k":576,"p":51,"f":16,"c":57},"mt":{"k":692,"p":54,"f":16,"c":83},"short":"Отбивные"},{"id":"M13","pool":"main","name":"Говядина с рисом и чёрной фасолью","time":40,"tags":["batch"],"items":{"beef":180,"beans":35,"rice":35,"onion":50,"tomato_puree":50,"oil":7},"train":{"rice":30},"steps":["Фасоль замочи на ночь и отвари до мягкости, 1–1,5 часа. Можно взять консервированную: её нужно примерно в 2,5 раза больше, чем сухой в списке, без жидкости.","Рис отвари отдельно.","Говядину нарежь кубиками и обжарь на масле, добавь лук, потом томатное пюре, кумин, паприку и полстакана воды. Туши 30 минут.","Добавь фасоль, прогрей 5 минут и подавай с рисом."],"note":"","what":"говядина, чёрная фасоль, рис","m":{"k":584,"p":51,"f":16,"c":59},"mt":{"k":688,"p":53,"f":16,"c":83},"short":"Говядина с фасолью"},{"id":"M14","pool":"main","name":"Фасолевый суп с курицей","time":60,"tags":["batch"],"items":{"chicken":170,"beans":40,"potato":140,"carrot":50,"onion":40,"tomato_puree":30,"oil":10},"train":{"potato":130},"steps":["Фасоль замочи на ночь. Можно взять консервированную: её нужно примерно в 2,5 раза больше, чем сухой в списке, без жидкости.","Фасоль вари в литре воды около часа, потом добавь курицу кубиками и картофель.","Лук и морковь обжарь на масле с томатным пюре и переложи в суп. Вари ещё 15–20 минут, в конце зелень и чеснок."],"note":"","what":"курица, чёрная фасоль, картошка","m":{"k":583,"p":51,"f":15,"c":61},"mt":{"k":683,"p":54,"f":15,"c":83},"short":"Фасолевый суп"}],"products":[{"t":"Йогурт Ser PRO+","es":"Yogur Ser PRO+ con proteínas","d":"15 г белка в баночке, мало жира, без добавленного сахара в натуральном. Натуральный «batido» 175 г — для сырников, крема, соусов. Питьевой «bebible» 190 г (ваниль, клубника-черника) — если хочется сладкого.","chk":"На упаковке: «15 g de proteínas por porción».","links":[["Dia, натуральный 175 г","https://diaonline.supermercadosdia.com.ar/yogur-batido-ser-pro-con-proteinas-sabor-natural-175-gr-14955/p"],["Dia, питьевой ваниль 190 г","https://diaonline.supermercadosdia.com.ar/yogur-bebible-ser-pro-con-proteinas-sabor-vainilla-190-gr-47322/p"]]},{"t":"Молоко La Serenísima Protein","es":"Leche Protein La Serenísima 1 l","d":"В обычном молоке около 3 г белка на 100 мл, в этом 5,2 г: 52 г на литр, 10 г в стакане. 0% жира, без лактозы. Есть в коробке и в пакете (sachet).","chk":"Строка «Proteínas»: не меньше 5 г на 100 мл.","links":[["Dia, 1 л","https://diaonline.supermercadosdia.com.ar/leche-protein-la-serenisima-1-lt-272382/p"],["Carrefour, пакет 1 л","https://www.carrefour.com.ar/leche-ultra-descremada-la-serenisima-protein-sachet-1-lt-783660/p"]]},{"t":"Рикотта обезжиренная","es":"Ricotta descremada / magra","d":"Наш творог: для сырников, блинчиков, запеканки и крема. Около 12 г белка на 100 г.","chk":"На упаковке «descremada» или «magra», белка 9–12 г на 100 г.","links":[["Dia, Ricotta DIA descremada 500 г","https://diaonline.supermercadosdia.com.ar/ricotta-dia-descremada-500-gr-269892/p"]]},{"t":"Сухое обезжиренное молоко","es":"Leche en polvo descremada","d":"Около 35 г белка на 100 г. Дешёвый способ добавить белок в йогурт, коктейль и овсянку. Подойдёт любая марка, в том числе Dia и Carrefour.","chk":"«Descremada», белка 33–36 г на 100 г.","links":[]},{"t":"Ветчина варёная","es":"Jamón cocido natural","d":"Именно jamón, а не paleta cocida: paleta — это лопатка, жирнее и с добавками. Не чаще раза в день.","chk":"Белка от 16 г на 100 г.","links":[]},{"t":"Говядина","es":"Nalga, peceto, cuadrada","d":"Самые постные куски: для бефстроганова, отбивных и говядины с фасолью. Видимый жир срезай до готовки.","chk":"Спроси в мясном отделе: «nalga» или «peceto».","links":[]},{"t":"Протеин, если решишь купить","es":"Whey protein","d":"Аргентинские марки Star Nutrition, ENA Sport, Gentech. Чаще всего их берут в dietéticas и на Mercado Libre. С протеином открываются ещё 2 перекуса, без него меню тоже работает.","chk":"Не меньше 70 г белка на 100 г порошка.","links":[]}],"trainDays":[1,2,4,6]};
+  var FOODS = DATA.foods, OPT = {}, POOL = { breakfast: [], main: [], snack: [] };
+  DATA.options.forEach(function (o) { OPT[o.id] = o; POOL[o.pool].push(o); });
+  var SLOTS = [{ id: "b", label: "Завтрак", pool: "breakfast" }, { id: "l", label: "Обед", pool: "main" },
+               { id: "s", label: "Перекус", pool: "snack" }, { id: "d", label: "Ужин", pool: "main" }];
+  var CAT_ORDER = ["Мясо и птица", "Яйца и молочное", "Крупы, фасоль, хлеб", "Овощи и фрукты", "Прочее"];
+
+  /* ---------- хранилище: облако Telegram, иначе браузер ---------- */
+  var CS = inTG && tg.isVersionAtLeast && tg.isVersionAtLeast("6.9") && tg.CloudStorage ? tg.CloudStorage : null;
+  var LS = null;
+  try { localStorage.setItem("pit:t", "1"); localStorage.removeItem("pit:t"); LS = localStorage; } catch (e) {}
+  var mem = {};
+  function get(k) { return new Promise(function (r) {
+    if (CS) { try { CS.getItem(k, function (e, v) { r(e ? (mem[k] || null) : (v || null)); }); } catch (err) { r(mem[k] || null); } return; }
+    try { r(LS ? LS.getItem("pit:" + k) : (mem[k] || null)); } catch (e) { r(mem[k] || null); }
+  }); }
+  function set(k, v) { mem[k] = v; return new Promise(function (r) {
+    if (CS) { try { CS.setItem(k, v, function () { r(); }); } catch (err) { r(); } return; }
+    try { if (LS) LS.setItem("pit:" + k, v); } catch (e) {}
+    r();
+  }); }
+
+  /* ---------- даты ---------- */
+  function pad(n) { return String(n).padStart(2, "0"); }
+  function ymd(d) { return String(d.getFullYear()).slice(2) + pad(d.getMonth() + 1) + pad(d.getDate()); }
+  function parseYmd(s) { return new Date(2000 + +s.slice(0, 2), +s.slice(2, 4) - 1, +s.slice(4, 6)); }
+  function addDays(d, n) { return new Date(d.getFullYear(), d.getMonth(), d.getDate() + n); }
+  function today0() { var n = new Date(); return new Date(n.getFullYear(), n.getMonth(), n.getDate()); }
+  function dayNum(d) { return Math.round(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()) / 864e5); }
+  var DN = ["воскресенье", "понедельник", "вторник", "среда", "четверг", "пятница", "суббота"];
+  var DNA = ["воскресенье", "понедельник", "вторник", "среду", "четверг", "пятницу", "субботу"];   // «меню на пятницу»
+  var DS = ["Вс", "Пн", "Вт", "Ср", "Чт", "Пт", "Сб"];
+  var MON = ["января", "февраля", "марта", "апреля", "мая", "июня", "июля", "августа", "сентября", "октября", "ноября", "декабря"];
+  function dLabel(d) { return d.getDate() + " " + MON[d.getMonth()]; }
+  function dShort(d) { return pad(d.getDate()) + "." + pad(d.getMonth() + 1); }
+  function cap(s) { return s.charAt(0).toUpperCase() + s.slice(1); }
+
+  /* ---------- состояние ---------- */
+  var CFG = { train: DATA.trainDays.slice(), whey: false };
+  var P = {}, W = [], CHK = {};
+  var cur = today0(), shop = { off: 0, n: 1 };
+
+  function load() {
+    return get("cfg").then(function (c) {
+      if (c) { try { var o = JSON.parse(c); if (o.train) CFG.train = o.train; CFG.whey = !!o.whey; } catch (e) {} }
+      return get("wlog");
+    }).then(function (w) {
+      W = (w || "").split("|").filter(Boolean).map(function (x) { var p = x.split(":"); return { d: p[0], w: parseFloat(p[1]) }; }).filter(function (x) { return x.w > 0; });
+      return get("mchk");
+    }).then(function (ch) {
+      if (ch) { try { CHK = JSON.parse(ch) || {}; } catch (e) {} }
+      var t = today0(), chain = Promise.resolve();
+      for (var i = -1; i < 7; i++) (function (k) {
+        chain = chain.then(function () { return get("p" + k).then(function (v) { if (v) { try { P[k] = JSON.parse(v); } catch (e) {} } }); });
+      })(ymd(addDays(t, i)));
+      return chain;
+    });
+  }
+  function saveCfg() { set("cfg", JSON.stringify(CFG)); }
+  function saveDay(d) { set("p" + ymd(d), JSON.stringify(P[ymd(d)] || {})); }
+  function rec(d) { var k = ymd(d); return P[k] || (P[k] = {}); }
+
+  /* ---------- план ---------- */
+  function isTrain(d) { return CFG.train.indexOf(d.getDay()) >= 0; }
+  function has(o, t) { return o.tags.indexOf(t) >= 0; }
+  function autoSel(d) {
+    var n = dayNum(d), wk = Math.floor(n / 7), B = POOL.breakfast, M = POOL.main;
+    var S = POOL.snack.filter(function (o) { return CFG.whey || !has(o, "whey"); });
+    var b = B[(n + wk) % B.length], si = (n * 3 + wk) % S.length;
+    if (has(b, "ham") && has(S[si], "ham")) si = (si + 1) % S.length;
+    var li = (n * 5 + wk) % M.length;
+    return { b: b.id, l: M[li].id, s: S[si].id, d: M[(li + 4) % M.length].id };
+  }
+  function sel(d) {
+    var r = P[ymd(d)], a = autoSel(d);
+    if (r && r.sel) SLOTS.forEach(function (s) { if (OPT[r.sel[s.id]]) a[s.id] = r.sel[s.id]; });
+    return a;
+  }
+  function itemsOf(o, train) {
+    var out = [];
+    Object.keys(o.items).forEach(function (id) { out.push({ id: id, g: o.items[id] + (train && o.train[id] ? o.train[id] : 0) }); });
+    if (train) Object.keys(o.train).forEach(function (id) { if (!(id in o.items)) out.push({ id: id, g: o.train[id] }); });
+    return out;
+  }
+  function slotTarget(slot, train) {
+    var t = DATA.targets[slot.pool];
+    return { P: t.P, F: t.F, C: t.C + (train && slot.pool === "main" ? DATA.trainExtraC : 0) };
+  }
+  function dayTarget(train) {
+    var s = { P: 0, F: 0, C: 0 };
+    SLOTS.forEach(function (x) { var t = slotTarget(x, train); s.P += t.P; s.F += t.F; s.C += t.C; });
+    s.kcal = Math.min(4 * s.P + 9 * s.F + 4 * s.C, DATA.dayTargets[train ? "train" : "rest"].k);
+    return s;
+  }
+  // Б, Ж, У округляются до целых, калории считаются из них: Б×4 + Ж×9 + У×4
+  function sumItems(items) {
+    var p = 0, f = 0, c = 0;
+    items.forEach(function (it) { var fd = FOODS[it.id]; p += fd.p * it.g / 100; f += fd.f * it.g / 100; c += fd.c * it.g / 100; });
+    p = Math.round(p); f = Math.round(f); c = Math.round(c);
+    return { p: p, f: f, c: c, k: 4 * p + 9 * f + 4 * c };
+  }
+  function solve(A, b) {
+    var n = b.length, M = A.map(function (row, i) { return row.concat([b[i]]); });
+    for (var c = 0; c < n; c++) {
+      var p = c;
+      for (var r = c + 1; r < n; r++) if (Math.abs(M[r][c]) > Math.abs(M[p][c])) p = r;
+      var tmp = M[c]; M[c] = M[p]; M[p] = tmp;
+      for (r = 0; r < n; r++) if (r !== c) { var q = M[r][c] / M[c][c]; for (var k = c; k <= n; k++) M[r][k] -= q * M[c][k]; }
+    }
+    return M.map(function (row, i) { return row[n] / row[i]; });
+  }
+  // Подстройка порции: белковая часть (P), гарнир и фрукты (C) и масло/орехи (F) меняются в разумных пределах,
+  // чтобы блюдо попало в свою цель. Яйца, хлеб, йогурт, овощи и специи остаются как в рецепте.
+  function fitDish(items, target, lo, hi, lam) {
+    var groups = ["P", "C", "F"].filter(function (g) { return items.some(function (it) { return FOODS[it.id].role === g; }); });
+    if (!groups.length) return items;
+    function part(test) {
+      var v = [0, 0, 0];
+      items.forEach(function (it) { var fd = FOODS[it.id]; if (test(fd.role)) { v[0] += fd.p * it.g / 100; v[1] += fd.f * it.g / 100; v[2] += fd.c * it.g / 100; } });
+      return v;
+    }
+    var fixed = part(function (r) { return groups.indexOf(r) < 0; });
+    var cols = groups.map(function (g) { return part(function (r) { return r === g; }); });
+    var want = [target.P - fixed[0], target.F - fixed[1], target.C - fixed[2]];
+    var w = [16, 81, 16], A = [], b = [];
+    cols.forEach(function (ci, i) {
+      var row = [], r = 0;
+      for (var m = 0; m < 3; m++) r += w[m] * ci[m] * want[m];
+      cols.forEach(function (cj, j) { var s = 0; for (var m2 = 0; m2 < 3; m2++) s += w[m2] * ci[m2] * cj[m2]; row.push(s + (i === j ? lam : 0)); });
+      A.push(row); b.push(r + lam);
+    });
+    var x = solve(A, b);
+    return items.map(function (it) {
+      var fd = FOODS[it.id], gi = groups.indexOf(fd.role);
+      if (gi < 0) return it;
+      var k = Math.min(hi, Math.max(lo, x[gi]));
+      return { id: it.id, g: Math.max(fd.step, Math.round(it.g * k / fd.step) * fd.step) };
+    });
+  }
+  function stepKcal(id) { var fd = FOODS[id]; return (4 * fd.p + 9 * fd.f + 4 * fd.c) * fd.step / 100; }
+  // План дня: завтрак как в рецепте, каждый следующий приём подстраивается под уже выбранные выше,
+  // ужин добирает остаток до нормы дня.
+  function planDay(d, selOverride, trainOverride) {
+    var train = trainOverride === undefined ? isTrain(d) : trainOverride, s = selOverride || sel(d);
+    var tg = SLOTS.map(function (x) { return slotTarget(x, train); }), day = dayTarget(train);
+    var rem = { P: day.P, F: day.F, C: day.C }, out = [];
+    SLOTS.forEach(function (x, i) {
+      var o = OPT[s[x.id]], items = itemsOf(o, train), target = tg[i];
+      if (i > 0) {
+        var rest = { P: 0, F: 0, C: 0 };
+        for (var j = i; j < SLOTS.length; j++) { rest.P += tg[j].P; rest.F += tg[j].F; rest.C += tg[j].C; }
+        target = { P: rem.P * tg[i].P / rest.P, F: rem.F * tg[i].F / rest.F, C: rem.C * tg[i].C / rest.C };
+        // обед и перекус меняются мягко (±20%), ужин сильнее: он добирает остаток дня
+        items = i < SLOTS.length - 1 ? fitDish(items, target, 0.8, 1.25, 300) : fitDish(items, target, 0.6, 1.5, 20);
+      }
+      var m = sumItems(items);
+      rem = { P: rem.P - m.p, F: rem.F - m.f, C: rem.C - m.c };
+      out.push({ slot: x, o: o, items: items, m: m, target: target });
+    });
+    // Точная доводка ужина шагами по 1–10 г: день не выше калорий тренера и как можно ближе к ним.
+    var last = out[out.length - 1];
+    function totalOf(key) { return out.reduce(function (a, r) { return a + r.m[key]; }, 0); }
+    function change(it, dir) {
+      var nu = { id: it.id, g: it.g + dir * FOODS[it.id].step };
+      last.items = last.items.map(function (x) { return x === it ? nu : x; });
+      last.m = sumItems(last.items);
+      return nu;
+    }
+    function trimSide() {
+      var side = last.items.filter(function (it) { return FOODS[it.id].role === "C" && it.g > FOODS[it.id].step; }).sort(function (a, b) { return b.g - a.g; })[0]
+        || last.items.filter(function (it) { return FOODS[it.id].role && it.g > FOODS[it.id].step; }).sort(function (a, b) { return stepKcal(b.id) - stepKcal(a.id); })[0];
+      if (!side) return false;
+      change(side, -1); return true;
+    }
+    while (totalOf("k") > day.kcal && trimSide()) {}
+    var blocked = {};
+    for (var guard = 0; guard < 60; guard++) {
+      var gap = day.kcal - totalOf("k");
+      var need = { P: (day.P - totalOf("p")) * 4, F: (day.F - totalOf("f")) * 9, C: (day.C - totalOf("c")) * 4 };
+      var fit = last.items.filter(function (it) { return FOODS[it.id].role && !blocked[it.id] && stepKcal(it.id) <= gap; })
+        .sort(function (a, b) { return need[FOODS[b.id].role] - need[FOODS[a.id].role] || stepKcal(b.id) - stepKcal(a.id); })[0];
+      if (!fit) break;
+      var added = change(fit, +1);
+      // округление Б/Ж/У может дать скачок больше шага: тогда откатываем и этот продукт больше не трогаем
+      if (totalOf("k") > day.kcal) { change(added, -1); blocked[fit.id] = 1; }
+    }
+    out.total = { k: 0, p: 0, f: 0, c: 0 };
+    out.forEach(function (r) { out.total.k += r.m.k; out.total.p += r.m.p; out.total.f += r.m.f; out.total.c += r.m.c; });
+    return out;
+  }
+  window.pitaniePlan = function (s, train) { return planDay(today0(), s, train); };  // для проверки всех сочетаний
+
+  /* ---------- формат ---------- */
+  var nf = new Intl.NumberFormat("ru-RU");
+  function N(x) { return nf.format(Math.round(x)); }
+  function R(x) { return Math.round(x); }
+  function one(x) { return (Math.round(x * 10) / 10).toString().replace(".", ","); }
+  function esc(s) { return String(s).replace(/[&<>"]/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", "\"": "&quot;" }[c]; }); }
+  function pl(n, a, b, c) { var n10 = n % 10, n100 = n % 100; if (n10 === 1 && n100 !== 11) return a; if (n10 >= 2 && n10 <= 4 && (n100 < 12 || n100 > 14)) return b; return c; }
+  var FR = [[0, ""], [0.25, "¼"], [1 / 3, "⅓"], [0.5, "½"], [2 / 3, "⅔"], [0.75, "¾"]];
+  function fracNear(x) {
+    var best = null;
+    for (var w = 0; w <= 8; w++) FR.forEach(function (fr) {
+      var v = w + fr[0]; if (v <= 0) return;
+      var dd = Math.abs(v - x); if (!best || dd < best.dd - 1e-9) best = { dd: dd, w: w, f: fr[0], s: fr[1] };
+    });
+    return best;
+  }
+  function qty(x, q) {
+    var v = Math.max(1 / q, Math.round(x * q) / q), w = Math.floor(v + 1e-9), f = v - w;
+    var s = f < 1e-6 ? "" : Math.abs(f - .5) < 1e-6 ? "½" : Math.abs(f - .25) < 1e-6 ? "¼" : "¾";
+    return { str: (w ? String(w) : "") + s, whole: !s, n: w };
+  }
+  // [сколько, подсказка]
+  function amt(id, g) {
+    var f = FOODS[id], hh = f.hh || {}, n, b, q, s;
+    if (f.u === "egg") return [Math.round(g / f.ug) + " шт", ""];
+    if (f.u === "white") { n = Math.round(g / f.ug); return [n + " " + pl(n, "белок", "белка", "белков"), "только белок"]; }
+    if (f.u === "slice") { n = Math.round(g / f.ug); return [n + " " + pl(n, "ломтик", "ломтика", "ломтиков"), g + " г"]; }
+    if (f.u === "pcs") return [Math.round(g / f.ug) + " шт", ""];
+    if (f.u === "ml") { b = fracNear(g / 250); return [g + " мл", (b.w ? b.w : "") + b.s + " " + (b.s ? "стакана" : pl(b.w, "стакан", "стакана", "стаканов"))]; }
+    if (f.u === "pot") { b = fracNear(g / f.ug); return b.s ? [g + " г", "≈ " + (b.w ? b.w : "") + b.s + " баночки"] : [b.w + " " + pl(b.w, "баночка", "баночки", "баночек"), g + " г"]; }
+    if (f.u === "scoop") {
+      if (g === f.ug) return ["1 мерная ложка", g + " г"];
+      q = qty(g / f.ug, 2);
+      return [g + " г", "≈ " + q.str + " " + (q.whole ? pl(q.n, "мерная ложка", "мерные ложки", "мерных ложек") : "мерной ложки")];
+    }
+    if (hh.k === "sp") { if (hh.max && g > hh.max) return [g + " г", ""]; return [g + " г", qty(g / hh.g, 2).str + " " + hh.s]; }
+    if (hh.k === "pc") { q = qty(g / hh.g, hh.q || 2); s = q.str + " " + (q.whole ? pl(q.n, hh.f[0], hh.f[1], hh.f[2]) : hh.f[1]); return [g + " г", "≈ " + s]; }
+    if (hh.k === "more") return [g + " г", "можно больше"];
+    return [g + " г", ""];
+  }
+  function amtShort(id, g) {
+    var f = FOODS[id], n;
+    if (f.u === "egg") return Math.round(g / f.ug) + " шт";
+    if (f.u === "white") { n = Math.round(g / f.ug); return n + " " + pl(n, "белок", "белка", "белков"); }
+    if (f.u === "slice") { n = Math.round(g / f.ug); return n + " " + pl(n, "ломтик", "ломтика", "ломтиков"); }
+    if (f.u === "pcs") return Math.round(g / f.ug) + " шт";
+    if (f.u === "ml") return g + " мл";
+    if (f.u === "pot" && g === f.ug) return "1 баночка";
+    return g + " г";
+  }
+  function macroLine(m) { return "Б " + R(m.p) + " · Ж " + R(m.f) + " · У " + R(m.c); }
+
+  /* ---------- меню ---------- */
+  var slotsEl = document.getElementById("slots");
+  function buildSlots() {
+    slotsEl.innerHTML = SLOTS.map(function (s) {
+      var chips = POOL[s.pool].map(function (o) {
+        var id = "opt-" + s.id + "-" + o.id;
+        var mark = has(o, "whey") ? '<span class="mark" data-whey>протеин</span>' : "";
+        return '<div class="chip"><input type="radio" name="sel-' + s.id + '" id="' + id + '" value="' + o.id + '">' +
+          '<label for="' + id + '">' + esc(o.short) + mark + "</label></div>";
+      }).join("");
+      return '<section class="slot" id="slot-' + s.id + '">' +
+        '<div class="slot-head"><h2>' + s.label + '</h2><span class="slot-target mono" data-target></span></div>' +
+        '<fieldset class="chips"><legend>' + s.label + ": вариант</legend>" + chips + "</fieldset>" +
+        '<article class="dish" data-dish></article></section>';
+    }).join("");
+    SLOTS.forEach(function (s) {
+      slotsEl.querySelectorAll('input[name="sel-' + s.id + '"]').forEach(function (inp) {
+        inp.addEventListener("change", function () {
+          var r = rec(cur), a = sel(cur); a[s.id] = inp.value; r.sel = a; saveDay(cur); hap(); render();
+        });
+      });
+    });
+  }
+
+  var FIT_NOTE = ["", "Граммы подстроены под завтрак, чтобы день сошёлся.", "Граммы подстроены под завтрак и обед.",
+    "Ужин добирает норму дня: граммы подстроены под завтрак, обед и перекус."];
+  function renderDish(r, train, i) {
+    var o = r.o, m = r.m, tags = "";
+    if (has(o, "prep")) tags += '<span class="pill prep">готовить с вечера</span>';
+    if (has(o, "whey")) tags += '<span class="pill whey">нужен протеин</span>';
+    if (has(o, "batch")) tags += '<span class="pill">можно на 3 дня</span>';
+    var rows = r.items.map(function (it) {
+      var f = FOODS[it.id], a = amt(it.id, it.g);
+      return '<li><span class="nm">' + esc(f.ru) + '<span class="es">' + esc(f.es) + '</span></span><span class="amt">' + a[0] + (a[1] ? "<small>" + a[1] + "</small>" : "") + "</span></li>";
+    }).join("");
+    var steps = o.steps.map(function (st) { return "<li>" + esc(st) + "</li>"; }).join("");
+    return '<h3 class="dish-title">' + esc(o.name) + "</h3>" +
+      '<div class="meta"><span class="pill">' + o.time + " мин</span>" + tags + "</div>" +
+      '<div class="dish-body"><ul class="ingr">' + rows + "</ul>" +
+      '<div class="nut" role="group" aria-label="Пищевая ценность порции"><div class="nut-h">Información nutricional</div>' +
+      '<div class="nut-sub">Порция: 1 приём' + (train && o.pool === "main" ? " · день тренировки" : "") + "</div>" +
+      '<div class="nut-row"><span>Энергия</span><b>' + m.k + " ккал</b></div>" +
+      '<div class="nut-row"><span><i class="dot p"></i>Белки</span><b>' + R(m.p) + " г</b></div>" +
+      '<div class="nut-row"><span><i class="dot f"></i>Жиры</span><b>' + R(m.f) + " г</b></div>" +
+      '<div class="nut-row"><span><i class="dot c"></i>Углеводы</span><b>' + R(m.c) + " г</b></div></div></div>" +
+      (FIT_NOTE[i] ? '<p class="note">' + FIT_NOTE[i] + "</p>" : "") +
+      (o.note ? '<p class="note">' + esc(o.note) + "</p>" : "") +
+      '<details class="how"><summary>Как готовить</summary><ol>' + steps + "</ol></details>";
+  }
+
+  function bar(cls, label, val, target) {
+    var w = Math.min(val / target, 1.25) / 1.25 * 100;
+    return '<div class="bar-row ' + cls + '"><div class="bar-lbl"><span><i class="dot ' + cls + '"></i>' + label +
+      '</span><span><b>' + R(val) + ' г</b> <span class="slot-target">/ ' + target + ' г</span></span></div>' +
+      '<div class="bar"><i style="width:' + w.toFixed(1) + '%"></i><span class="tick"></span></div></div>';
+  }
+  function alerts(s, train) {
+    var out = [];
+    var ham = SLOTS.filter(function (x) { return has(OPT[s[x.id]], "ham"); }).length;
+    if (ham > 1) out.push('<div class="alert">Ветчина в двух приёмах. Лучше раз в день: замени завтрак или перекус.</div>');
+    if (!CFG.whey && SLOTS.some(function (x) { return has(OPT[s[x.id]], "whey"); })) out.push('<div class="alert">Для этого перекуса нужен протеин. Если его нет, выбери вариант без пометки «протеин».</div>');
+    if (s.l === s.d) out.push('<div class="alert">Обед и ужин одинаковые. Так можно, но разные блюда интереснее.</div>');
+    if (train) out.push('<div class="alert info">День тренировки: гарнир в обеде и ужине больше. Граммы уже посчитаны.</div>');
+    if (!out.length) out.push('<div class="alert ok">День собран: калории и БЖУ в норме.</div>');
+    return out.join("");
+  }
+
+  function renderDays() {
+    var t0 = today0(), k = ymd(cur);
+    document.getElementById("days").innerHTML = [0, 1, 2, 3, 4, 5, 6].map(function (i) {
+      var d = addDays(t0, i), tr = isTrain(d), on = ymd(d) === k;
+      return '<button type="button" class="day ' + (tr ? "tr " : "") + (i === 0 ? "today" : "") + '" data-day="' + i + '" aria-pressed="' + on + '" aria-label="' +
+        (i === 0 ? "Сегодня, " : "") + DN[d.getDay()] + ", " + dLabel(d) + (tr ? ", тренировка" : ", отдых") + '">' +
+        '<span class="a">' + DS[d.getDay()] + '</span><span class="b">' + d.getDate() + '</span><span class="c">' + (tr ? "трен." : "отдых") + "</span></button>";
+    }).join("");
+    var train = isTrain(cur), isToday = k === ymd(t0);
+    document.getElementById("dayinfo").innerHTML = "<b>" + (isToday ? "Сегодня, " : "") + (isToday ? DN[cur.getDay()] : cap(DN[cur.getDay()])) + ", " + dLabel(cur) +
+      " — " + (train ? "день тренировки." : "день отдыха.") + "</b> " + (train ? "Гарнир в обеде и ужине больше, граммы уже посчитаны." : "Обычные порции.");
+  }
+
+  function render() {
+    var train = isTrain(cur), s = sel(cur), plan = planDay(cur);
+    renderDays();
+    document.getElementById("has-whey").checked = CFG.whey;
+    plan.forEach(function (r, i) {
+      var el = document.getElementById("slot-" + r.slot.id);
+      var inp = document.getElementById("opt-" + r.slot.id + "-" + r.o.id);
+      if (inp) inp.checked = true;
+      var tp = Math.round(r.target.P), tf = Math.round(r.target.F), tc = Math.round(r.target.C);
+      el.querySelector("[data-target]").textContent = "цель ≈" + (4 * tp + 9 * tf + 4 * tc) + " ккал · Б " + tp + " · Ж " + tf + " · У " + tc;
+      el.querySelector("[data-dish]").innerHTML = renderDish(r, train, i);
+      el.querySelectorAll("[data-whey]").forEach(function (mk) { mk.hidden = CFG.whey; });
+    });
+    var tot = plan.total, tg2 = dayTarget(train);
+    document.getElementById("summary").innerHTML =
+      '<span class="eyebrow">Итог дня · ' + (train ? "тренировка" : "отдых") + "</span>" +
+      '<div class="sum-k"><span class="big">' + N(tot.k) + '</span><span class="unit">ккал из ' + N(tg2.kcal) + "</span></div>" +
+      '<div class="bars">' + bar("p", "Белки", tot.p, tg2.P) + bar("f", "Жиры", tot.f, tg2.F) + bar("c", "Углеводы", tot.c, tg2.C) + "</div>" +
+      '<div class="alerts">' + alerts(s, train) + "</div>";
+    document.getElementById("bottombar").innerHTML =
+      "<span><b>" + N(tot.k) + "</b> ккал · Б <b>" + R(tot.p) + "</b> · Ж <b>" + R(tot.f) + "</b> · У <b>" + R(tot.c) + "</b></span>" +
+      '<span class="mode">' + (train ? "тренировка" : "отдых") + "</span>";
+    renderDayList();
+  }
+
+  function sumFor(dates) {
+    var sum = {};
+    dates.forEach(function (d) {
+      planDay(d).forEach(function (r) { r.items.forEach(function (it) { sum[it.id] = (sum[it.id] || 0) + it.g; }); });
+    });
+    return sum;
+  }
+  function rowsFor(sum) {
+    var rows = {}, eggs = Math.round((sum.egg || 0) / 50), whites = Math.round((sum.egg_white || 0) / 33);
+    function add(cat, id, name, es, val) { (rows[cat] = rows[cat] || []).push({ id: id, name: name, es: es, val: val }); }
+    Object.keys(sum).forEach(function (id) {
+      if (id === "egg" || id === "egg_white") return;
+      var f = FOODS[id], g = Math.round(sum[id]), val, n;
+      if (f.u === "ml") val = g >= 1000 ? one(g / 1000) + " л" : g + " мл";
+      else if (f.u === "pot") { n = Math.ceil(g / f.ug - 0.05); val = n + " " + pl(n, "баночка", "баночки", "баночек"); }
+      else if (f.u === "slice" || f.u === "pcs") val = amtShort(id, g);
+      else val = g >= 1000 ? one(g / 1000) + " кг" : g + " г";
+      add(f.cat, id, f.ru, f.es, val);
+    });
+    if (eggs + whites) add("Яйца и молочное", "eggs", "Яйца", "Huevos", (eggs + whites) + " шт" + (whites ? " (" + whites + " только на белок)" : ""));
+    return rows;
+  }
+  function renderDayList() {
+    var rows = rowsFor(sumFor([cur]));
+    var html = CAT_ORDER.filter(function (c) { return rows[c]; }).map(function (c) {
+      return "<div><h3>" + c + '</h3><ul class="ingr">' + rows[c].map(function (x) {
+        return '<li><span class="nm">' + esc(x.name) + '<span class="es">' + esc(x.es) + '</span></span><span class="amt">' + x.val + "</span></li>";
+      }).join("") + "</ul></div>";
+    }).join("");
+    document.getElementById("day-list").innerHTML =
+      '<h2 id="day-list-h">Продукты на этот день</h2>' +
+      '<p class="hint">Сырой вес на один день, для одного человека.</p>' +
+      '<div class="cats">' + html + "</div>" +
+      '<button class="btn wide" id="shareDay" type="button">Переслать меню в чат (например, маме)</button>' +
+      '<p class="hint">Откроется Telegram: выбери чат, и туда придёт список блюд с граммами на этот день.</p>';
+  }
+
+  function pick(arr) { return arr[Math.floor(Math.random() * arr.length)]; }
+  function shuffle() {
+    var cur0 = sel(cur);
+    for (var tries = 0; tries < 200; tries++) {
+      var a = {};
+      SLOTS.forEach(function (x) {
+        var pool = POOL[x.pool].filter(function (o) { return (CFG.whey || !has(o, "whey")) && o.id !== cur0[x.id]; });
+        a[x.id] = pick(pool).id;
+      });
+      var ham = SLOTS.filter(function (x) { return has(OPT[a[x.id]], "ham"); }).length;
+      if (ham <= 1 && a.l !== a.d) { rec(cur).sel = a; break; }
+    }
+    saveDay(cur); hap("medium"); render();
+  }
+
+  /* ---------- покупки ---------- */
+  var RANGES = [{ off: 0, n: 1, l: "Сегодня" }, { off: 1, n: 1, l: "Завтра" }, { off: 0, n: 3, l: "3 дня" }, { off: 0, n: 7, l: "Неделя" }];
+  function shopDates() { var t0 = today0(), out = []; for (var i = 0; i < shop.n; i++) out.push(addDays(t0, shop.off + i)); return out; }
+  function rangeLabel(dates) { return dates.length === 1 ? DNA[dates[0].getDay()] + ", " + dLabel(dates[0]) : dShort(dates[0]) + "–" + dShort(dates[dates.length - 1]); }
+  function renderShop() {
+    var dates = shopDates(), rows = rowsFor(sumFor(dates)), key = ymd(dates[0]) + ":" + dates.length, done = CHK[key] || [];
+    document.getElementById("shop-ranges").innerHTML = '<div class="chips">' + RANGES.map(function (r) {
+      var on = r.off === shop.off && r.n === shop.n;
+      return '<button type="button" class="tday" data-range="' + r.off + ":" + r.n + '" aria-pressed="' + on + '">' + r.l + "</button>";
+    }).join("") + "</div>";
+    document.getElementById("shop-list").innerHTML = '<span class="eyebrow">Список на ' + rangeLabel(dates) + "</span>" +
+      CAT_ORDER.filter(function (c) { return rows[c]; }).map(function (c) {
+        return '<div><h3 class="eyebrow" style="margin:10px 0 2px">' + c + "</h3>" + rows[c].map(function (x) {
+          var on = done.indexOf(x.id) >= 0;
+          return '<button type="button" class="chk' + (on ? " done" : "") + '" data-chk="' + x.id + '" data-key="' + key + '" aria-pressed="' + on + '"><span class="bx" aria-hidden="true"></span>' +
+            '<span class="tx"><b>' + esc(x.name) + "</b><small>" + esc(x.es) + '</small></span><span class="am">' + x.val + "</span></button>";
+        }).join("") + "</div>";
+      }).join("");
+    document.getElementById("shop-products").innerHTML = DATA.products.map(function (p) {
+      return '<div class="card"><h3>' + esc(p.t) + '</h3><span class="es">' + esc(p.es) + "</span><p>" + esc(p.d) + '</p><p class="hint">' + esc(p.chk) + "</p>" +
+        (p.links.length ? '<div class="lnks">' + p.links.map(function (l) {
+          return '<a class="btn ghost" href="' + esc(l[1]) + '" target="_blank" rel="noopener" data-link="' + esc(l[1]) + '">Фото: ' + esc(l[0]) + "</a>";
+        }).join("") + "</div>" : "") + "</div>";
+    }).join("");
+  }
+
+  /* ---------- правила: дни и вес ---------- */
+  function renderRules() {
+    document.getElementById("tdays").innerHTML = [1, 2, 3, 4, 5, 6, 0].map(function (n) {
+      var on = CFG.train.indexOf(n) >= 0;
+      return '<button type="button" class="tday" data-tday="' + n + '" aria-pressed="' + on + '">' + DS[n] + "</button>";
+    }).join("");
+    var k = ymd(today0()), wt = W.filter(function (x) { return x.d === k; })[0];
+    var wIn = document.getElementById("wIn"); if (document.activeElement !== wIn) wIn.value = wt ? one(wt.w) : "";
+    var map = {};
+    W.forEach(function (x) { var d = parseYmd(x.d), mon = ymd(addDays(d, -((d.getDay() + 6) % 7))); (map[mon] = map[mon] || []).push(x.w); });
+    var ws = Object.keys(map).sort().map(function (m) { var a = map[m]; return { start: parseYmd(m), avg: a.reduce(function (s, v) { return s + v; }, 0) / a.length, n: a.length }; });
+    var html = "";
+    if (!ws.length) html = '<p class="hint">Записывай вес каждое утро: здесь появится среднее по неделям и подсказка, что делать.</p>';
+    else {
+      html = ws.slice(-5).map(function (w, i, arr) {
+        var prev = i > 0 ? arr[i - 1] : null, dl = prev ? w.avg - prev.avg : null;
+        return '<div class="wrow"><span>' + dShort(w.start) + "–" + dShort(addDays(w.start, 6)) + " · " + w.n + " " + pl(w.n, "замер", "замера", "замеров") + "</span><span><b>" + one(w.avg) + " кг</b>" +
+          (dl !== null ? ' <span class="' + (dl < 0 ? "dn" : "upc") + '">' + (dl > 0 ? "+" : dl < 0 ? "−" : "") + one(Math.abs(dl)) + "</span>" : "") + "</span></div>";
+      }).join("");
+      var ok = ws.filter(function (w) { return w.n >= 3; }), adv = "Для вывода нужно 2 недели, в каждой хотя бы 3 замера.";
+      if (ok.length >= 2) {
+        var dl = ok[ok.length - 1].avg - ok[ok.length - 2].avg;
+        if (dl <= -0.7) adv = "Минус " + one(-dl) + " кг за неделю — это быстро. Если так две недели подряд, добавь 150–200 ккал в день: около 40 г риса или макарон.";
+        else if (dl <= -0.2) adv = "Минус " + one(-dl) + " кг за неделю — хороший темп. Ничего не меняй.";
+        else adv = "Вес почти стоит. Если талия уменьшается и силовые растут, это рекомпозиция. Если три недели не меняются ни вес, ни талия, убери 150 ккал: 40 г гарнира в одном приёме.";
+      }
+      html += '<div class="alert ' + (ok.length >= 2 ? "ok" : "info") + '" style="margin-top:8px">' + adv + "</div>";
+    }
+    document.getElementById("weights").innerHTML = html;
+  }
+
+  /* ---------- отправка ---------- */
+  var toastT;
+  function toast(msg) { var el = document.getElementById("toast"); el.textContent = msg; el.hidden = false; clearTimeout(toastT); toastT = setTimeout(function () { el.hidden = true; }, 2400); }
+  function share(text) {
+    hap("medium");
+    if (inTG) { try { tg.openTelegramLink("https://t.me/share/url?url=" + encodeURIComponent(location.href.split("#")[0]) + "&text=" + encodeURIComponent(text)); return; } catch (e) {} }
+    try { navigator.clipboard.writeText(text).then(function () { toast("Скопировано: вставь в чат"); }, function () { toast("Не получилось скопировать"); }); }
+    catch (e) { toast("Не получилось скопировать"); }
+  }
+  function dayText(d) {
+    var t = isTrain(d), plan = planDay(d), tot = plan.total;
+    var out = ["Меню на " + DNA[d.getDay()] + ", " + dLabel(d) + " (" + (t ? "день тренировки" : "день отдыха") + ")"];
+    plan.forEach(function (r) {
+      out.push("", r.slot.label + ": " + r.o.name);
+      out.push(r.items.map(function (it) { return (FOODS[it.id].sh ? FOODS[it.id].sh + " " : "") + amtShort(it.id, it.g); }).join(", "));
+    });
+    out.push("", "Итого " + N(tot.k) + " ккал · " + macroLine(tot));
+    return out.join("\n");
+  }
+  function shopText() {
+    var dates = shopDates(), rows = rowsFor(sumFor(dates)), out = ["Продукты на " + rangeLabel(dates) + ":"];
+    CAT_ORDER.forEach(function (c) { if (!rows[c]) return; out.push("", c); rows[c].forEach(function (x) { out.push("— " + x.name + ": " + x.val); }); });
+    return out.join("\n");
+  }
+
+  /* ---------- события ---------- */
+  document.addEventListener("click", function (e) {
+    var t = e.target, el;
+    if ((el = t.closest("[data-day]"))) { hap(); cur = addDays(today0(), +el.getAttribute("data-day")); render(); return; }
+    if ((el = t.closest("[data-range]"))) { var p = el.getAttribute("data-range").split(":"); shop = { off: +p[0], n: +p[1] }; hap(); renderShop(); return; }
+    if ((el = t.closest("[data-chk]"))) {
+      var key = el.getAttribute("data-key"), id = el.getAttribute("data-chk"), arr = CHK[key] || (CHK[key] = []), i = arr.indexOf(id), on = i < 0;
+      if (on) arr.push(id); else arr.splice(i, 1);
+      el.classList.toggle("done", on); el.setAttribute("aria-pressed", on); hap();
+      var keys = Object.keys(CHK); while (keys.length > 6) delete CHK[keys.shift()];
+      set("mchk", JSON.stringify(CHK)); return;
+    }
+    if ((el = t.closest("[data-tday]"))) {
+      var n = +el.getAttribute("data-tday"), j = CFG.train.indexOf(n);
+      if (j >= 0) CFG.train.splice(j, 1); else CFG.train.push(n);
+      saveCfg(); hap(); renderRules(); render(); return;
+    }
+    if ((el = t.closest("[data-link]"))) { if (inTG) { e.preventDefault(); try { tg.openLink(el.getAttribute("data-link")); } catch (err) {} } return; }
+    if (t.closest("#shareDay")) { share(dayText(cur)); return; }
+    if (t.closest("#shareShop")) { share(shopText()); return; }
+  });
+  document.getElementById("has-whey").addEventListener("change", function (e) { CFG.whey = e.target.checked; saveCfg(); hap(); render(); });
+  document.getElementById("shuffle").addEventListener("click", shuffle);
+  document.getElementById("wIn").addEventListener("change", function (e) {
+    var v = parseFloat(String(e.target.value).replace(",", ".")), k = ymd(today0());
+    W = W.filter(function (x) { return x.d !== k; });
+    if (v > 30 && v < 250) { W.push({ d: k, w: Math.round(v * 10) / 10 }); W.sort(function (a, b) { return a.d < b.d ? -1 : 1; }); toast("Вес записан"); }
+    while (W.length > 200) W.shift();
+    set("wlog", W.map(function (x) { return x.d + ":" + x.w; }).join("|"));
+    renderRules();
+  });
+
+  /* ---------- вкладки ---------- */
+  var VIEWS = ["menu", "pokupki", "razbor", "pravila"];
+  function showView() {
+    var v = (location.hash || "").slice(1);
+    if (VIEWS.indexOf(v) < 0) v = "menu";
+    document.querySelectorAll("section.view").forEach(function (sec) { sec.hidden = sec.getAttribute("data-view") !== v; });
+    document.querySelectorAll(".tabs a").forEach(function (a) {
+      if (a.getAttribute("data-view") === v) a.setAttribute("aria-current", "page"); else a.removeAttribute("aria-current");
+    });
+    document.getElementById("bottombar").hidden = v !== "menu";
+    document.body.classList.toggle("has-bar", v === "menu");
+    if (v === "pokupki") renderShop();
+    if (v === "pravila") renderRules();
+  }
+  window.addEventListener("hashchange", function () { showView(); window.scrollTo(0, 0); hap(); });
+
+  buildSlots();
+  render();
+  showView();
+  load().then(function () { render(); showView(); });
+})();
+</script>
+</body>
+</html>
